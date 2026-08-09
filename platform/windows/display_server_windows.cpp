@@ -8062,16 +8062,16 @@ DisplayServerWindows::DisplayServerWindows(const String &p_rendering_driver, Dis
 	for (uint32_t i = 0; i < rendering_driver_count; i++) {
 		const String &tested_rendering_driver = rendering_drivers[i];
 
-#ifdef VULKAN_ENABLED
-		if (tested_rendering_driver == "vulkan") {
-			rendering_context = memnew(RenderingContextDriverVulkanWindows);
-			tested_drivers.set_flag(DRIVER_ID_RD_VULKAN);
-		}
-#endif
 #ifdef D3D12_ENABLED
 		if (tested_rendering_driver == "d3d12") {
 			rendering_context = memnew(RenderingContextDriverD3D12);
 			tested_drivers.set_flag(DRIVER_ID_RD_D3D12);
+		}
+#endif
+#ifdef VULKAN_ENABLED
+		if (tested_rendering_driver == "vulkan") {
+			rendering_context = memnew(RenderingContextDriverVulkanWindows);
+			tested_drivers.set_flag(DRIVER_ID_RD_VULKAN);
 		}
 #endif
 		if (rendering_context != nullptr) {
@@ -8399,11 +8399,11 @@ DisplayServerWindows::DisplayServerWindows(const String &p_rendering_driver, Dis
 Vector<String> DisplayServerWindows::get_rendering_drivers_func() {
 	Vector<String> drivers;
 
-#ifdef VULKAN_ENABLED
-	drivers.push_back("vulkan");
-#endif
 #ifdef D3D12_ENABLED
 	drivers.push_back("d3d12");
+#endif
+#ifdef VULKAN_ENABLED
+	drivers.push_back("vulkan");
 #endif
 #ifdef GLES3_ENABLED
 	drivers.push_back("opengl3");

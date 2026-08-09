@@ -2791,10 +2791,13 @@ Error RenderingDeviceDriverD3D12::swap_chain_resize(CommandQueueID p_cmd_queue, 
 	bool create_for_composition = false;
 #endif
 
+	uint32_t target_width = MAX(1u, surface->width);
+	uint32_t target_height = MAX(1u, surface->height);
+
 	DXGI_SWAP_CHAIN_DESC1 swap_chain_desc = {};
 	if (swap_chain->d3d_swap_chain != nullptr) {
 		_swap_chain_release_buffers(swap_chain);
-		res = swap_chain->d3d_swap_chain->ResizeBuffers(p_desired_framebuffer_count, surface->width, surface->height, DXGI_FORMAT_UNKNOWN, creation_flags);
+		res = swap_chain->d3d_swap_chain->ResizeBuffers(p_desired_framebuffer_count, target_width, target_height, DXGI_FORMAT_UNKNOWN, creation_flags);
 		ERR_FAIL_COND_V(!SUCCEEDED(res), ERR_UNAVAILABLE);
 	} else {
 		DEV_ASSERT(swap_chain->render_pass.id == 0);
@@ -2815,8 +2818,8 @@ Error RenderingDeviceDriverD3D12::swap_chain_resize(CommandQueueID p_cmd_queue, 
 			swap_chain_desc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
 			has_comp_alpha[(uint64_t)p_cmd_queue.id] = false;
 		}
-		swap_chain_desc.Width = surface->width;
-		swap_chain_desc.Height = surface->height;
+		swap_chain_desc.Width = target_width;
+		swap_chain_desc.Height = target_height;
 
 		ComPtr<IDXGISwapChain1> swap_chain_1;
 		if (create_for_composition) {

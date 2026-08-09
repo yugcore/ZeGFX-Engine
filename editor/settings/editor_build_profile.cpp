@@ -65,8 +65,8 @@ const char *EditorBuildProfile::build_option_identifiers[BUILD_OPTION_MAX] = {
 	"rendering_device", // FIXME: There's no scons option to disable rendering device.
 	"forward_plus_renderer",
 	"forward_mobile_renderer",
-	"vulkan",
 	"d3d12",
+	"vulkan",
 	"metal",
 	"opengl3",
 	"disable_physics_2d",
@@ -228,11 +228,11 @@ const HashMap<EditorBuildProfile::BuildOption, LocalVector<EditorBuildProfile::B
 	{ BUILD_OPTION_MOBILE_RENDERER, {
 			BUILD_OPTION_RENDERING_DEVICE,
 	} },
-	{ BUILD_OPTION_VULKAN, {
+	{ BUILD_OPTION_D3D12, {
 			BUILD_OPTION_FORWARD_RENDERER,
 			BUILD_OPTION_MOBILE_RENDERER,
 	} },
-	{ BUILD_OPTION_D3D12, {
+	{ BUILD_OPTION_VULKAN, {
 			BUILD_OPTION_FORWARD_RENDERER,
 			BUILD_OPTION_MOBILE_RENDERER,
 	} },

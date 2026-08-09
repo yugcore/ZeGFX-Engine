@@ -81,11 +81,11 @@ extern "C" {
 #include "gl_manager_windows_native.h"
 #endif
 
-#if defined(VULKAN_ENABLED)
-#include "drivers/vulkan/rendering_context_driver_vulkan.h"
-#endif
 #if defined(D3D12_ENABLED)
 #include "drivers/d3d12/rendering_context_driver_d3d12.h"
+#endif
+#if defined(VULKAN_ENABLED)
+#include "drivers/vulkan/rendering_context_driver_vulkan.h"
 #endif
 #if defined(GLES3_ENABLED)
 #include "drivers/gles3/rasterizer_gles3.h"
