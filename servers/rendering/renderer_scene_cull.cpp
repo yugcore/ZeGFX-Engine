@@ -35,6 +35,7 @@
 #include "core/math/geometry_3d.h"
 #include "core/object/callable_mp.h"
 #include "core/object/worker_thread_pool.h"
+#include "servers/rendering/renderer_rd/renderer_scene_d3d12.h"
 #include "servers/rendering/rendering_light_culler.h"
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
