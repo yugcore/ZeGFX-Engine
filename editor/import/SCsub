@@ -3,5 +3,28 @@ from misc.utility.scons_hints import *
 
 Import("env")
 
+env.Append(CPPPATH=["#ZeGFX", "#ZeGFX/include", "#ZeGFX/src", "#ZeGFX/third_party/ufbx", "#ZeGFX/third_party/bc7enc_rdo"])
+
 env.add_source_files(env.editor_sources, "*.cpp")
 env.add_source_files(env.editor_sources, "3d/*.cpp")
+
+# ZeGFX Asset Cooker & Importer Pipeline Sources
+env.add_source_files(env.editor_sources, "#ZeGFX/src/cooker/asset_cooker.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/translators/vox_parser.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/translators/ufbx_parser.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/pipeline/graph_processor.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/factories/asset_builder.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/registry/asset_registry.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/core/pipeline_orchestrator.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/shader_source.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/asset_importer.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/gltf_importer.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/vox_importer.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/ufbx_importer.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/assimp_importer.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/diagnostics.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/third_party/ufbx/ufbx.c")
+env.add_source_files(env.editor_sources, "#ZeGFX/third_party/bc7enc_rdo/bc7enc.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/third_party/bc7enc_rdo/rgbcx.cpp")
+env.add_source_files(env.editor_sources, "#ZeGFX/src/stb_image_impl.cpp")
+

@@ -29,6 +29,7 @@
 /**************************************************************************/
 
 #include "resource_importer_scene.h"
+#include "ZeGFX/include/cooker/asset_cooker.h"
 
 #include "core/error/error_macros.h"
 #include "core/io/dir_access.h"
@@ -2677,6 +2678,7 @@ void ResourceImporterScene::get_import_options(const String &p_path, List<Import
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "materials/extract", PROPERTY_HINT_ENUM, "Keep Internal,Extract Once,Extract and Overwrite"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "materials/extract_format", PROPERTY_HINT_ENUM, "Text (*.tres),Binary (*.res),Material (*.material)"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::STRING, "materials/extract_path", PROPERTY_HINT_DIR, ""), ""));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "zegfx/import_mode", PROPERTY_HINT_ENUM, "Native Engine Format,ZeGFX Cooked (.zmesh),Ask Every Time"), IMPORT_MODE_NATIVE));
 
 	r_options->push_back(ImportOption(PropertyInfo(Variant::DICTIONARY, "_subresources", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), Dictionary()));
 
@@ -3287,6 +3289,22 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 	}
 
 	List<String> missing_deps; // for now, not much will be done with this
+	int zegfx_mode = p_options.has("zegfx/import_mode") ? int(p_options["zegfx/import_mode"]) : IMPORT_MODE_NATIVE;
+
+	if (zegfx_mode == IMPORT_MODE_ZEGFX_COOKED) {
+		zegfx::cooker::AssetCooker cooker;
+		String base_name = src_path.get_file().get_basename();
+		String content_dir = "Content/Meshes";
+		String cooked_output_path = content_dir + "/" + base_name + ".zmesh";
+
+		zegfx::cooker::CookResult cook_res = cooker.CookMesh(src_path.utf8().get_data(), cooked_output_path.utf8().get_data());
+		if (cook_res.success) {
+			print_verbose(vformat("ZeGFX AssetCooker successfully baked '%s' -> '%s' (.zmesh V2)", src_path, cooked_output_path));
+		} else {
+			WARN_PRINT(vformat("ZeGFX AssetCooker failed for '%s' (%s). Automatically degrading to Native Import Mode.", src_path, String(cook_res.errorMessage.c_str())));
+		}
+	}
+
 	Node *scene = importer->import_scene(src_path, import_flags, p_options, &missing_deps, &err);
 	if (!scene || err != OK) {
 		return err;
