@@ -74,6 +74,13 @@ st[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]
 .venv
 venv
 
+
+#Core
+Zelyn/
+ZeGFX/
+
+
+
 # Python generated
 __pycache__/
 *.pyc

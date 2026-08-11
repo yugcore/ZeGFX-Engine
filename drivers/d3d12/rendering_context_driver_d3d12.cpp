@@ -29,6 +29,7 @@
 /**************************************************************************/
 
 #include "rendering_context_driver_d3d12.h"
+#include "zegfx_d3d12_bridge.h"
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -72,6 +73,10 @@ RenderingContextDriverD3D12::RenderingContextDriverD3D12() {}
 RenderingContextDriverD3D12::~RenderingContextDriverD3D12() {
 	// Let's release manually everything that may still be holding
 	// onto the DLLs before freeing them.
+	if (ZeGFXD3D12Bridge::get_singleton()) {
+		memdelete(ZeGFXD3D12Bridge::get_singleton());
+	}
+
 	device_factory.Reset();
 	dxgi_factory.Reset();
 
@@ -226,6 +231,10 @@ Error RenderingContextDriverD3D12::initialize() {
 	err = _initialize_devices();
 	ERR_FAIL_COND_V(err != OK, ERR_CANT_CREATE);
 
+	if (!ZeGFXD3D12Bridge::get_singleton()) {
+		memnew(ZeGFXD3D12Bridge);
+	}
+
 	return OK;
 }
 
@@ -255,6 +264,12 @@ RenderingContextDriver::SurfaceID RenderingContextDriverD3D12::surface_create(co
 	const WindowPlatformData *wpd = (const WindowPlatformData *)(p_platform_data);
 	Surface *surface = memnew(Surface);
 	surface->hwnd = wpd->window;
+
+	if (ZeGFXD3D12Bridge::get_singleton() && wpd->window) {
+		String err;
+		ZeGFXD3D12Bridge::get_singleton()->initialize((void *)wpd->window, err);
+	}
+
 	return SurfaceID(surface);
 }
 

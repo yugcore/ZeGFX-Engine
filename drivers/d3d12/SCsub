@@ -106,6 +106,7 @@ mesa_private_inc_paths = [v for v in mesa_private_inc_paths if v not in mesa_bla
 # Added by ourselves.
 extra_defines = [
     "WINDOWS_NO_FUTEX",
+    "WITH_DX12_BACKEND",
 ]
 
 mesa_ver = Path(mesa_absdir + "/VERSION.info")
@@ -164,6 +165,21 @@ env_d3d12_rdd.Append(CPPDEFINES=extra_defines)
 # Thirdparty.
 thirdparty_obj = []
 
+zegfx_inc_paths = [
+    "#ZeGFX/include",
+    "#ZeGFX/include/core",
+    "#ZeGFX/include/factories",
+    "#ZeGFX/include/pipeline",
+    "#ZeGFX/include/registry",
+    "#ZeGFX/include/translators",
+    "#ZeGFX/src",
+    "#ZeGFX/src/dx12",
+    "#ZeGFX/third_party",
+    "#ZeGFX/third_party/ufbx",
+    "#thirdparty/ufbx",
+]
+env_d3d12_rdd.Prepend(CPPPATH=zegfx_inc_paths)
+
 env_thirdparty = env_d3d12_rdd.Clone()
 env_thirdparty.disable_warnings()
 
@@ -182,6 +198,60 @@ env.drivers_sources += thirdparty_obj
 
 driver_obj = []
 env_d3d12_rdd.add_source_files(driver_obj, "*.cpp")
+
+zegfx_src_files = [
+    "#ZeGFX/src/zegfx.cpp",
+    "#ZeGFX/src/backend_factory.cpp",
+    "#ZeGFX/src/default_backend.cpp",
+    "#ZeGFX/src/headless_backend.cpp",
+    "#ZeGFX/src/dx12_dxr.cpp",
+    "#ZeGFX/src/dx12_pipeline.cpp",
+    "#ZeGFX/src/pipeline_cache.cpp",
+    "#ZeGFX/src/render_graph.cpp",
+    "#ZeGFX/src/render_parameters.cpp",
+    "#ZeGFX/src/render_world.cpp",
+    "#ZeGFX/src/scene.cpp",
+    "#ZeGFX/src/shader_artifact.cpp",
+    "#ZeGFX/src/shader_compiler.cpp",
+    "#ZeGFX/src/shader_library.cpp",
+    "#ZeGFX/src/shader_reflection.cpp",
+    "#ZeGFX/src/shader_source.cpp",
+    "#ZeGFX/src/shader_variant.cpp",
+    "#ZeGFX/src/platform_win32.cpp",
+    "#ZeGFX/src/diagnostics.cpp",
+    "#ZeGFX/src/binding_layout.cpp",
+    "#ZeGFX/src/hot_reload.cpp",
+    "#ZeGFX/src/asset_manager.cpp",
+    "#ZeGFX/src/asset_registry.cpp",
+    "#ZeGFX/src/asset_importer.cpp",
+    "#ZeGFX/src/gltf_importer.cpp",
+    "#ZeGFX/src/ufbx_importer.cpp",
+    "#ZeGFX/src/assimp_importer.cpp",
+    "#ZeGFX/src/vox_importer.cpp",
+    "#ZeGFX/src/heightmap_importer.cpp",
+    "#ZeGFX/src/zegfx_ufbx_translator.cpp",
+    "#ZeGFX/src/zegfx_vox_translator.cpp",
+    "#ZeGFX/src/zegfx_graph.cpp",
+    "#ZeGFX/src/zegfx_pipeline.cpp",
+    "#ZeGFX/src/zegfx_factory.cpp",
+    "#ZeGFX/src/terrain_system.cpp",
+    "#ZeGFX/src/renderer_spine.cpp",
+]
+
+for src_file in zegfx_src_files:
+    env_d3d12_rdd.add_source_files(driver_obj, src_file)
+
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/dx12/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/lighting/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/post/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/raytracing/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/core/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/pipeline/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/diagnostics/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/translators/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/registry/*.cpp")
+env_d3d12_rdd.add_source_files(driver_obj, "#ZeGFX/src/factories/*.cpp")
+
 env.drivers_sources += driver_obj
 
 # Needed to force rebuilding the driver files when the thirdparty code is updated.

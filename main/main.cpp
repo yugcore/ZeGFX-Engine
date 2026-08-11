@@ -2323,8 +2323,8 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	{
 		// RenderingDevice driver overrides per platform.
-		GLOBAL_DEF_RST("rendering/rendering_device/driver", "vulkan");
-		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.windows", PROPERTY_HINT_ENUM, "vulkan,d3d12"), "vulkan");
+		GLOBAL_DEF_RST("rendering/rendering_device/driver", "d3d12");
+		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.windows", PROPERTY_HINT_ENUM, "d3d12,vulkan"), "d3d12");
 		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.linuxbsd", PROPERTY_HINT_ENUM, "vulkan"), "vulkan");
 		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.android", PROPERTY_HINT_ENUM, "vulkan"), "vulkan");
 		GLOBAL_DEF_RST(PropertyInfo(Variant::STRING, "rendering/rendering_device/driver.ios", PROPERTY_HINT_ENUM, "metal,vulkan"), "metal");
@@ -2439,11 +2439,16 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	if (default_renderer_mobile.is_empty()) {
 		default_renderer_mobile = "gl_compatibility";
 	}
-	// Default to Compatibility when using the project manager.
+	// Default driver selection when using the project manager.
 	if (rendering_driver.is_empty() && rendering_method.is_empty() && project_manager) {
+#if defined(WINDOWS_ENABLED) && defined(D3D12_ENABLED)
+		rendering_driver = "d3d12";
+		rendering_method = "forward_plus";
+#else
 		rendering_driver = "opengl3";
 		rendering_method = "gl_compatibility";
 		default_renderer_mobile = "gl_compatibility";
+#endif
 	}
 #endif
 
