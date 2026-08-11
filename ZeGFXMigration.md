@@ -9,9 +9,9 @@ Under this plan, Direct3D 12 with ZeGFX becomes the **primary, default rendering
 ## 1. Executive Summary & Architectural Strategy
 
 * **Selected Architectural Strategy**: **Thin ZeGFX Abstraction**
-  - Host engine driver wrappers (`drivers/d3d12/zegfx_d3d12_bridge`) interface directly with `ZeGFX::GraphicsBackend` and ZeGFX engine modules (Render Graph, G-Buffer, Volumetric Fog, Virtual Geometry, DXR).
-  - Low-level Direct3D 12 calls (`ID3D12Device`, `ID3D12GraphicsCommandList`, `ID3D12DescriptorHeap`) remain encapsulated inside `ZeGFX/src/dx12/`.
-  - Reuses ZeGFX's 33+ production-ready subsystems and 45 automated headless test scripts (`run_headless_smokes.ps1`).
+  - Host engine driver wrappers (`drivers/d3d12/d3d12_bridge`) interface directly with `ZeGFX::GraphicsBackend` and ZeGFX engine modules (Render Graph, G-Buffer, Volumetric Fog, Virtual Geometry, DXR).
+  - Low-level Direct3D 12 calls (`ID3D12Device`, `ID3D12GraphicsCommandList`, `ID3D12DescriptorHeap`) are compiled from ZeGFX source modules (`ZeGFX/src/dx12/`).
+  - Verification & validation suites are executed directly within the **main engine at root** (`z:\ZeGFX-Engine`), referencing imported ZeGFX source materials.
 
 * **Primary Backend Goal**: Make Direct3D 12 (`d3d12`) the default rendering driver for Windows builds across the engine initialization sequence (`main.cpp`, `display_server_windows.cpp`, `os_windows.cpp`).
 * **Backend Demotion**: Demote Vulkan and GLES3 to secondary/fallback rendering drivers.
@@ -58,17 +58,21 @@ Promote Direct3D 12 (`d3d12`) to the primary default graphics backend on Windows
 
 #### Existing Files Modified
 * **[main/main.cpp](file:///z:/ZeGFX-Engine/main/main.cpp)**
-  - Change default value of `rendering/rendering_device/driver.windows` from `"vulkan"` to `"d3d12"`.
+  - Change default value of `rendering/rendering_device/driver` (line 2326) and `rendering/rendering_device/driver.windows` (line 2327) from `"vulkan"` to `"d3d12"`.
   - Prioritize `"d3d12"` in available driver list initialization on Windows.
 * **[platform/windows/display_server_windows.cpp](file:///z:/ZeGFX-Engine/platform/windows/display_server_windows.cpp)**
   - Set default rendering driver selection to `"d3d12"`.
   - Re-order driver probing logic so `RenderingContextDriverD3D12` initializes first.
 * **[platform/windows/os_windows.cpp](file:///z:/ZeGFX-Engine/platform/windows/os_windows.cpp)**
   - Configure default rendering context driver instantiation to create `RenderingContextDriverD3D12`.
-* **[SConstruct](file:///z:/ZeGFX-Engine/SConstruct)**
-  - Set `d3d12=yes` as default for Windows build configurations.
+* **[platform/windows/detect.py](file:///z:/ZeGFX-Engine/platform/windows/detect.py)**
+  - Confirm `d3d12=True` default is set (line 297). This is the actual build system file controlling D3D12 enablement, not `SConstruct`.
+* **[editor/settings/editor_build_profile.cpp](file:///z:/ZeGFX-Engine/editor/settings/editor_build_profile.cpp)**
+  - Update build profile default driver mappings to prioritize `d3d12` over `vulkan`.
 * **[drivers/d3d12/SCsub](file:///z:/ZeGFX-Engine/drivers/d3d12/SCsub)**
   - Add ZeGFX DX12 backend source files and header include paths (`ZeGFX/include`, `ZeGFX/src/dx12`).
+
+> **Note:** [editor/editor_node.cpp](file:///z:/ZeGFX-Engine/editor/editor_node.cpp) (line 8426) already sets `rendering/rendering_device/driver.windows` to `"d3d12"` in editor settings — no modification required.
 
 #### New Files Created
 * **[drivers/d3d12/zegfx_d3d12_bridge.h](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_d3d12_bridge.h)**
@@ -128,8 +132,10 @@ Fix critical ZeGFX DX12 backend bottlenecks: eliminate the per-frame CPU-GPU syn
 Wire ZeGFX's automated pass dependency render graph (`dx12_render_graph.cpp`) and D3D12 pipeline state object (PSO) caching engine into the host engine's rendering pipeline.
 
 #### Existing Files Modified
+* **[ZeGFX/src/render_graph.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/render_graph.cpp)**
+  - Core render graph API: update pass dependency compiler and resource lifetime tracking.
 * **[ZeGFX/src/dx12/dx12_render_graph.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/dx12_render_graph.cpp)**
-  - Expand automatic resource barrier generator to handle subresource state transitions (depth read/write, render target, SRV, UAV).
+  - DX12-specific render graph: expand automatic resource barrier generator to handle subresource state transitions (depth read/write, render target, SRV, UAV).
 * **[ZeGFX/src/pipeline_cache.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/pipeline_cache.cpp)**
   - Enable disk serialization of compiled D3D12 PSOs using engine user cache directory paths.
 * **[drivers/d3d12/rendering_device_driver_d3d12.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/rendering_device_driver_d3d12.cpp)**
@@ -138,9 +144,9 @@ Wire ZeGFX's automated pass dependency render graph (`dx12_render_graph.cpp`) an
   - Connect rendering graph pass boundaries to ZeGFX D3D12 render graph compiler.
 
 #### New Files Created
-* **[drivers/d3d12/zegfx_pipeline_state_manager.h](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_pipeline_state_manager.h)**
+* **[drivers/d3d12/d3d12_pipeline_state_manager.h](file:///z:/ZeGFX-Engine/drivers/d3d12/d3d12_pipeline_state_manager.h)**
   - Bridge class managing translation between engine shader blobs and ZeGFX D3D12 PSO cache.
-* **[drivers/d3d12/zegfx_pipeline_state_manager.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_pipeline_state_manager.cpp)**
+* **[drivers/d3d12/d3d12_pipeline_state_manager.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/d3d12_pipeline_state_manager.cpp)**
   - Implementation of PSO prewarming, disk caching, and DXIL bytecode loading.
 
 #### Recommendations for ZeGFX
@@ -169,9 +175,9 @@ Activate ZeGFX's high-performance deferred rendering path (G-Buffer layout: Dept
   - Feed engine scene light instances into ZeGFX lighting system.
 
 #### New Files Created
-* **[servers/rendering/renderer_rd/renderer_scene_zegfx_dx12.h](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/renderer_scene_zegfx_dx12.h)**
+* **[servers/rendering/renderer_rd/renderer_scene_d3d12.h](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/renderer_scene_d3d12.h)**
   - Scene renderer adapter delegating 3D geometry rendering and light culling to ZeGFX DX12 deferred path.
-* **[servers/rendering/renderer_rd/renderer_scene_zegfx_dx12.cpp](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/renderer_scene_zegfx_dx12.cpp)**
+* **[servers/rendering/renderer_rd/renderer_scene_d3d12.cpp](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/renderer_scene_d3d12.cpp)**
   - Implementation of scene renderer binding ZeGFX G-Buffer and deferred compute lighting.
 
 #### Recommendations for ZeGFX
@@ -201,9 +207,9 @@ Integrate ZeGFX's bindless two-pass volumetric froxel fog (compute injection + Z
   - Bind 3D texture volumetric froxel fog compute dispatches (lighting injection + raymarch prefix-sum).
 
 #### New Files Created
-* **[drivers/d3d12/zegfx_volumetrics_pass.h](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_volumetrics_pass.h)**
+* **[drivers/d3d12/volumetrics_pass.h](file:///z:/ZeGFX-Engine/drivers/d3d12/volumetrics_pass.h)**
   - Volumetric froxel fog execution interface.
-* **[drivers/d3d12/zegfx_volumetrics_pass.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_volumetrics_pass.cpp)**
+* **[drivers/d3d12/volumetrics_pass.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/volumetrics_pass.cpp)**
   - Implementation of 3D froxel buffer dispatch and composite pass.
 
 #### Recommendations for ZeGFX
@@ -229,15 +235,15 @@ Complete incomplete ZeGFX post-processing passes: bind Ground Truth Ambient Occl
   - Wire dual-filtering upsample/downsample compute blur pyramid.
 * **[ZeGFX/src/post/exposure.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/post/exposure.cpp)**
   - Connect luminance histogram auto-exposure compute pass.
-* **[ZeGFX/src/post/tonemapping.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/post/tonemapping.cpp)**
+* **[ZeGFX/src/post/tonemap.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/post/tonemap.cpp)**
   - Connect ACES color mapping and color grading GPU parameters.
 
 #### New Files Created
 * **[ZeGFX/src/post/gtao_pass.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/post/gtao_pass.cpp)**
   - Dedicated Ground Truth Ambient Occlusion compute execution pass.
-* **[drivers/d3d12/zegfx_post_composite.h](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_post_composite.h)**
+* **[drivers/d3d12/post_composite.h](file:///z:/ZeGFX-Engine/drivers/d3d12/post_composite.h)**
   - Post-processing composite pipeline manager for DX12 primary backend.
-* **[drivers/d3d12/zegfx_post_composite.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_post_composite.cpp)**
+* **[drivers/d3d12/post_composite.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/post_composite.cpp)**
   - Execution wrapper chaining bloom, exposure, GTAO, SSR, and tonemapping.
 
 #### Recommendations for ZeGFX
@@ -264,9 +270,9 @@ Enable ZeGFX's virtual geometry page streaming, GPU compute frustum culling, mes
   - Issue D3D12 `ExecuteIndirect` commands for indirect multi-draw submission.
 
 #### New Files Created
-* **[drivers/d3d12/zegfx_gpu_scene_bridge.h](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_gpu_scene_bridge.h)**
+* **[drivers/d3d12/gpu_scene_bridge.h](file:///z:/ZeGFX-Engine/drivers/d3d12/gpu_scene_bridge.h)**
   - Bridge interface connecting engine scene nodes to ZeGFX GPU virtual geometry engine.
-* **[drivers/d3d12/zegfx_gpu_scene_bridge.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_gpu_scene_bridge.cpp)**
+* **[drivers/d3d12/gpu_scene_bridge.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/gpu_scene_bridge.cpp)**
   - Implementation uploading instance matrices and mesh cluster buffers to GPU scene buffers.
 
 #### Recommendations for ZeGFX
@@ -289,15 +295,23 @@ Transition ZeGFX DXR ray-tracing modules from CPU fallback to hardware GPU `Disp
   - Optimize bottom-level (BLAS) and top-level (TLAS) acceleration structure updates per frame.
 * **[ZeGFX/src/raytracing/shader_binding_table.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/shader_binding_table.cpp)**
   - Build D3D12 Shader Binding Tables (SBT) for RayGen, Miss, and HitGroup shader records.
-* **[ZeGFX/src/dx12/dx12_dxr.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/dx12_dxr.cpp)**
-  - Replace CPU fallback execution with hardware `ID3D12GraphicsCommandList4::DispatchRays`.
+* **[ZeGFX/src/dx12_dxr.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12_dxr.cpp)**
+  - Replace CPU fallback execution with hardware `ID3D12GraphicsCommandList4::DispatchRays`. *(Note: this file is in `ZeGFX/src/`, not `ZeGFX/src/dx12/`)*
 * **[ZeGFX/src/raytracing/rt_shadows.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/rt_shadows.cpp)**, **[rt_reflections.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/rt_reflections.cpp)**, **[rt_ao.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/rt_ao.cpp)**
   - Activate DXR GPU hardware dispatch passes.
+* **[ZeGFX/src/raytracing/rt_pipeline.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/rt_pipeline.cpp)**
+  - Activate hardware RT pipeline state object management for DXR dispatch.
+* **[ZeGFX/src/raytracing/rt_scene.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/rt_scene.cpp)**
+  - Wire RT scene management for per-frame acceleration structure updates.
+* **[ZeGFX/src/raytracing/dxr_allocator.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/dxr_allocator.cpp)**
+  - Optimize DXR memory allocation for BLAS/TLAS scratch and result buffers.
+* **[ZeGFX/src/raytracing/dxr_capabilities.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/raytracing/dxr_capabilities.cpp)**
+  - Hardware DXR capability detection for feature-level gating of `DispatchRays` vs compute fallback.
 
 #### New Files Created
-* **[drivers/d3d12/zegfx_dxr_pipeline.h](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_dxr_pipeline.h)**
+* **[drivers/d3d12/dxr_pipeline.h](file:///z:/ZeGFX-Engine/drivers/d3d12/dxr_pipeline.h)**
   - Hardware Ray Tracing pipeline manager interface.
-* **[drivers/d3d12/zegfx_dxr_pipeline.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/zegfx_dxr_pipeline.cpp)**
+* **[drivers/d3d12/dxr_pipeline.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/dxr_pipeline.cpp)**
   - Acceleration structure builder and DXR State Object dispatch handler.
 
 #### Recommendations for ZeGFX
@@ -316,24 +330,24 @@ Transition ZeGFX DXR ray-tracing modules from CPU fallback to hardware GPU `Disp
 Run automated headless validation suites (`run_headless_smokes.ps1`), canary visual pixel tests (`run_visual_validation.ps1`), and verify frame time performance to confirm DX12 primary path stability via ZeGFX.
 
 #### Existing Files Modified
-* **[ZeGFX/run_headless_smokes.ps1](file:///z:/ZeGFX-Engine/ZeGFX/run_headless_smokes.ps1)**
-  - Verify all 45 headless smoke test scripts pass on D3D12 primary backend.
-* **[ZeGFX/run_visual_validation.ps1](file:///z:/ZeGFX-Engine/ZeGFX/run_visual_validation.ps1)**
-  - Validate visual canary render output frames against GPU golden references.
+* **[run_headless_smokes.ps1](file:///z:/ZeGFX-Engine/run_headless_smokes.ps1)**
+  - Execute automated main engine headless smoke test suite for the D3D12 primary backend.
+* **[run_visual_validation.ps1](file:///z:/ZeGFX-Engine/run_visual_validation.ps1)**
+  - Validate main engine visual canary render output frames against GPU golden references.
 * **[tests/test_main.cpp](file:///z:/ZeGFX-Engine/tests/test_main.cpp)**
-  - Add DX12 driver initialization unit tests.
+  - Add DX12 driver initialization and pipeline unit tests in the root test suite.
 
 #### New Files Created
-* **[tests/test_zegfx_dx12_driver.h](file:///z:/ZeGFX-Engine/tests/test_zegfx_dx12_driver.h)**
-  - Automated C++ test suite validating ZeGFX DX12 primary driver initialization, swapchain creation, upload ring-buffers, and PSO caching.
+* **[tests/test_d3d12_driver.h](file:///z:/ZeGFX-Engine/tests/test_d3d12_driver.h)**
+  - Main engine C++ test suite validating D3D12 primary driver initialization, swapchain creation, upload ring-buffers, and PSO caching.
 
-#### Recommendations for ZeGFX
-* Maintain `-Build` flag execution in automated CI pipelines to guarantee zero build regressions.
+#### Recommendations for Main Engine Build
+* Maintain automated CI pipeline test execution on root engine targets to guarantee zero regressions.
 
 #### Phase 9 Verification & Validation Plan
-* **Automated Headless Suite Execution**: Execute script: `powershell -ExecutionPolicy Bypass -File .\ZeGFX\run_headless_smokes.ps1 -Build`. Verify output result: `45 headless smoke scripts passed, 0 failed.`
-* **Automated Visual Canary Pixel Match**: Execute script: `powershell -ExecutionPolicy Bypass -File .\ZeGFX\run_visual_validation.ps1`. Verify automated pixel diff comparison against golden reference frame snapshots yields `0 pixel mismatches exceeding tolerance threshold (0.1%)`.
-* **C++ Automated Unit Test Suite**: Run native test binary `bin/zelyn_tests.exe --gtest_filter=ZeGFX*`. Confirm 100% test pass rate for DX12 device creation, ring buffer allocation, and shader cache loading.
+* **Automated Headless Suite Execution**: Execute script from root: `powershell -ExecutionPolicy Bypass -File .\run_headless_smokes.ps1`. Verify output result: `all headless smoke scripts passed, 0 failed.`
+* **Automated Visual Canary Pixel Match**: Execute script from root: `powershell -ExecutionPolicy Bypass -File .\run_visual_validation.ps1`. Verify automated pixel diff comparison against golden reference frame snapshots yields `0 pixel mismatches exceeding tolerance threshold (0.1%)`.
+* **C++ Automated Unit Test Suite**: Run native root test binary `--gtest_filter=D3D12*`. Confirm 100% test pass rate for DX12 device creation, ring buffer allocation, and shader cache loading.
 
 ---
 
