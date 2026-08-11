@@ -796,6 +796,14 @@ void SceneImportSettingsDialog::open_settings(const String &p_path, const String
 				}
 			}
 		}
+
+		if (defaults.is_empty()) {
+			List<ResourceImporter::ImportOption> options_list;
+			_resource_importer_scene->get_import_options(p_path, &options_list);
+			for (const ResourceImporter::ImportOption &E : options_list) {
+				defaults[E.option.name] = E.default_value;
+			}
+		}
 	}
 
 	// Regardless of p_scene_import_type, use PackedScene for pre_import because we want to see the full thing.
@@ -834,7 +842,7 @@ void SceneImportSettingsDialog::open_settings(const String &p_path, const String
 	// Start with the root item (Scene) selected.
 	scene_tree->get_root()->select(0);
 
-	set_title(vformat(TTR("Advanced Import Settings for %s '%s'"), _resource_importer_scene->get_visible_name(), base_path.get_file()));
+	set_title(vformat(TTR("ZeGFX Import Settings: %s"), base_path.get_file()));
 }
 
 SceneImportSettingsDialog *SceneImportSettingsDialog::singleton = nullptr;

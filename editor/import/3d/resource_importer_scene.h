@@ -155,6 +155,14 @@ VARIANT_ENUM_CAST(EditorScenePostImportPlugin::InternalImportCategory)
 class ResourceImporterScene : public ResourceImporter {
 	GDCLASS(ResourceImporterScene, ResourceImporter);
 
+public:
+	enum ZeGFXImportMode {
+		IMPORT_MODE_NATIVE = 0,
+		IMPORT_MODE_ZEGFX_COOKED = 1,
+		IMPORT_MODE_ASK_ON_IMPORT = 2,
+	};
+
+private:
 	static Vector<Ref<EditorSceneFormatImporter>> scene_importers;
 	static Vector<Ref<EditorScenePostImportPlugin>> post_importer_plugins;
 

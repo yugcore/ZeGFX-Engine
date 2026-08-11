@@ -29,8 +29,12 @@
 /**************************************************************************/
 
 #include "resource_importer_scene.h"
+#include "ZeGFX/include/cooker/asset_cooker.h"
 
+#include "core/config/engine.h"
+#include "core/config/project_settings.h"
 #include "core/error/error_macros.h"
+#include "core/object/callable_mp.h"
 #include "core/io/dir_access.h"
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
@@ -289,6 +293,13 @@ int ResourceImporterScene::get_format_version() const {
 }
 
 bool ResourceImporterScene::get_option_visibility(const String &p_path, const String &p_option, const HashMap<StringName, Variant> &p_options) const {
+	if (p_option.begins_with("zegfx/")) {
+		if (p_option == "zegfx/import_mode") {
+			return true;
+		}
+		int mode = p_options.has("zegfx/import_mode") ? int(p_options["zegfx/import_mode"]) : IMPORT_MODE_ASK_ON_IMPORT;
+		return (mode == IMPORT_MODE_ZEGFX_COOKED || mode == IMPORT_MODE_ASK_ON_IMPORT);
+	}
 	if (p_option.begins_with("mesh_library/")) {
 		return _scene_import_type == "MeshLibrary";
 	}
@@ -2677,6 +2688,13 @@ void ResourceImporterScene::get_import_options(const String &p_path, List<Import
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "materials/extract", PROPERTY_HINT_ENUM, "Keep Internal,Extract Once,Extract and Overwrite"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "materials/extract_format", PROPERTY_HINT_ENUM, "Text (*.tres),Binary (*.res),Material (*.material)"), 0));
 	r_options->push_back(ImportOption(PropertyInfo(Variant::STRING, "materials/extract_path", PROPERTY_HINT_DIR, ""), ""));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::INT, "zegfx/import_mode", PROPERTY_HINT_ENUM, "Native Engine Format,ZeGFX Cooked (.zmesh),Ask Every Time"), IMPORT_MODE_ASK_ON_IMPORT));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "zegfx/generate_lods"), true));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "zegfx/generate_meshlets"), true));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "zegfx/mikktspace_tangents"), true));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "zegfx/bc7_ormi_compression"), true));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "zegfx/dxr_blas_proxies"), true));
+	r_options->push_back(ImportOption(PropertyInfo(Variant::BOOL, "zegfx/vhacd_collision_hulls"), true));
 
 	r_options->push_back(ImportOption(PropertyInfo(Variant::DICTIONARY, "_subresources", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), Dictionary()));
 
@@ -3287,6 +3305,31 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 	}
 
 	List<String> missing_deps; // for now, not much will be done with this
+	int zegfx_mode = p_options.has("zegfx/import_mode") ? int(p_options["zegfx/import_mode"]) : IMPORT_MODE_ASK_ON_IMPORT;
+
+	if (zegfx_mode == IMPORT_MODE_ZEGFX_COOKED) {
+		zegfx::cooker::AssetCooker cooker;
+		String base_name = src_path.get_file().get_basename();
+		String content_dir = "res://assets/" + base_name;
+		String cooked_output_path = content_dir + "/" + base_name + ".zmesh";
+
+		String global_content_dir = ProjectSettings::get_singleton()->globalize_path(content_dir);
+		Ref<DirAccess> da = DirAccess::create_for_path(global_content_dir);
+		if (da.is_valid()) {
+			da->make_dir_recursive(global_content_dir);
+		}
+
+		String global_src = ProjectSettings::get_singleton()->globalize_path(src_path);
+		String global_out = ProjectSettings::get_singleton()->globalize_path(cooked_output_path);
+
+		zegfx::cooker::CookResult cook_res = cooker.CookMesh(global_src.utf8().get_data(), global_out.utf8().get_data());
+		if (cook_res.success) {
+			print_verbose(vformat("ZeGFX AssetCooker successfully baked '%s' -> '%s' (.zmesh V2)", src_path, cooked_output_path));
+		} else {
+			WARN_PRINT(vformat("ZeGFX AssetCooker failed for '%s' (%s). Automatically degrading to Native Import Mode.", src_path, String(cook_res.errorMessage.c_str())));
+		}
+	}
+
 	Node *scene = importer->import_scene(src_path, import_flags, p_options, &missing_deps, &err);
 	if (!scene || err != OK) {
 		return err;
