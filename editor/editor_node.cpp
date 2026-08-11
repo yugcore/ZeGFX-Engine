@@ -7122,6 +7122,27 @@ void EditorNode::_dropped_files(const Vector<String> &p_files) {
 	_add_dropped_files_recursive(p_files, to_path);
 
 	EditorFileSystem::get_singleton()->scan_changes();
+
+	List<String> importer_exts;
+	ResourceImporterScene::get_scene_importer_extensions(&importer_exts);
+
+	String first_3d_file;
+	for (int i = 0; i < p_files.size(); i++) {
+		String ext = p_files[i].get_extension().to_lower();
+		for (const String &E : importer_exts) {
+			if (ext == E) {
+				String res_path = ProjectSettings::get_singleton()->localize_path(to_path.path_join(p_files[i].get_file()));
+				if (first_3d_file.is_empty()) {
+					first_3d_file = res_path;
+				}
+				break;
+			}
+		}
+	}
+
+	if (!first_3d_file.is_empty()) {
+		callable_mp(SceneImportSettingsDialog::get_singleton(), &SceneImportSettingsDialog::open_settings).call_deferred(first_3d_file, String("PackedScene"));
+	}
 }
 
 void EditorNode::_add_dropped_files_recursive(const Vector<String> &p_files, String to_path) {

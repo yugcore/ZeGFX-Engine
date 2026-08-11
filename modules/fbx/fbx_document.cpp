@@ -1312,6 +1312,60 @@ Error FBXDocument::_parse_materials(Ref<FBXState> p_state) {
 		if (fbx_material->features.double_sided.enabled && fbx_material->features.double_sided.is_explicit) {
 			material->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
 		}
+
+		// Auto-discover companion textures if material texture slots are missing/unassigned
+		if (material->get_texture(BaseMaterial3D::TEXTURE_ALBEDO).is_null()) {
+			Vector<String> albedo_kws;
+			albedo_kws.push_back("albedo"); albedo_kws.push_back("basecolor"); albedo_kws.push_back("diffuse"); albedo_kws.push_back("color"); albedo_kws.push_back("col"); albedo_kws.push_back("bc");
+			Ref<Texture2D> auto_albedo = _discover_companion_texture(p_state, _as_string(fbx_material->name), albedo_kws, TEXTURE_TYPE_GENERIC);
+			if (auto_albedo.is_valid()) {
+				material->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, auto_albedo);
+			}
+		}
+
+		if (material->get_texture(BaseMaterial3D::TEXTURE_NORMAL).is_null()) {
+			Vector<String> normal_kws;
+			normal_kws.push_back("normal"); normal_kws.push_back("norm"); normal_kws.push_back("nrm"); normal_kws.push_back("bump");
+			Ref<Texture2D> auto_normal = _discover_companion_texture(p_state, _as_string(fbx_material->name), normal_kws, TEXTURE_TYPE_NORMAL);
+			if (auto_normal.is_valid()) {
+				material->set_texture(BaseMaterial3D::TEXTURE_NORMAL, auto_normal);
+				material->set_feature(BaseMaterial3D::FEATURE_NORMAL_MAPPING, true);
+			}
+		}
+
+		if (material->get_texture(BaseMaterial3D::TEXTURE_ROUGHNESS).is_null()) {
+			Vector<String> rough_kws;
+			rough_kws.push_back("roughness"); rough_kws.push_back("rough"); rough_kws.push_back("rgh"); rough_kws.push_back("ormi"); rough_kws.push_back("arm");
+			Ref<Texture2D> auto_rough = _discover_companion_texture(p_state, _as_string(fbx_material->name), rough_kws, TEXTURE_TYPE_GENERIC);
+			if (auto_rough.is_valid()) {
+				material->set_texture(BaseMaterial3D::TEXTURE_ROUGHNESS, auto_rough);
+				material->set_roughness_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED);
+				material->set_roughness(1.0);
+			}
+		}
+
+		if (material->get_texture(BaseMaterial3D::TEXTURE_METALLIC).is_null()) {
+			Vector<String> metal_kws;
+			metal_kws.push_back("metallic"); metal_kws.push_back("metal"); metal_kws.push_back("met");
+			Ref<Texture2D> auto_metal = _discover_companion_texture(p_state, _as_string(fbx_material->name), metal_kws, TEXTURE_TYPE_GENERIC);
+			if (auto_metal.is_valid()) {
+				material->set_texture(BaseMaterial3D::TEXTURE_METALLIC, auto_metal);
+				material->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED);
+				material->set_metallic(1.0);
+			}
+		}
+
+		if (material->get_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION).is_null()) {
+			Vector<String> ao_kws;
+			ao_kws.push_back("ao"); ao_kws.push_back("occlusion");
+			Ref<Texture2D> auto_ao = _discover_companion_texture(p_state, _as_string(fbx_material->name), ao_kws, TEXTURE_TYPE_GENERIC);
+			if (auto_ao.is_valid()) {
+				material->set_texture(BaseMaterial3D::TEXTURE_AMBIENT_OCCLUSION, auto_ao);
+				material->set_ao_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_RED);
+				material->set_feature(BaseMaterial3D::FEATURE_AMBIENT_OCCLUSION, true);
+			}
+		}
+
 		p_state->materials.push_back(material);
 	}
 
@@ -2389,6 +2443,52 @@ String FBXDocument::_get_texture_path(const String &p_base_dir, const String &p_
 		}
 	}
 	return String();
+}
+
+Ref<Texture2D> FBXDocument::_discover_companion_texture(Ref<FBXState> p_state, const String &p_material_name, const Vector<String> &p_keywords, int p_texture_type) const {
+	String base_dir = p_state->get_base_path();
+	if (base_dir.is_empty()) {
+		return Ref<Texture2D>();
+	}
+
+	const Vector<String> subdirs = {
+		"", "textures/", "Textures/", "images/",
+		"Images/", "materials/", "Materials/",
+		"maps/", "Maps/", "tex/", "Tex/"
+	};
+
+	String mat_lower = p_material_name.to_lower();
+
+	for (int i = 0; i < subdirs.size(); ++i) {
+		String search_dir = base_dir.path_join(subdirs[i]);
+		Ref<DirAccess> dir = DirAccess::open(search_dir);
+		if (dir.is_null()) continue;
+
+		dir->list_dir_begin();
+		String file_name = dir->get_next();
+		while (!file_name.is_empty()) {
+			if (!dir->current_is_dir()) {
+				String file_lower = file_name.to_lower();
+				String ext = file_lower.get_extension();
+				if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "tga" || ext == "bmp" || ext == "webp" || ext == "dds") {
+					for (int k = 0; k < p_keywords.size(); ++k) {
+						String kw = p_keywords[k].to_lower();
+						if (file_lower.contains(kw)) {
+							if (mat_lower.is_empty() || file_lower.contains(mat_lower) || mat_lower.contains(file_lower.left(MIN(4, mat_lower.length())))) {
+								String full_path = search_dir.path_join(file_name);
+								Ref<Texture2D> tex = ResourceLoader::load(full_path, "Texture2D");
+								if (tex.is_valid()) {
+									return tex;
+								}
+							}
+						}
+					}
+				}
+			}
+			file_name = dir->get_next();
+		}
+	}
+	return Ref<Texture2D>();
 }
 
 Error FBXDocument::_parse_skins(Ref<FBXState> p_state) {

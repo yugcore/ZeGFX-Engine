@@ -67,6 +67,7 @@ public:
 
 private:
 	String _get_texture_path(const String &p_base_directory, const String &p_source_file_path) const;
+	Ref<Texture2D> _discover_companion_texture(Ref<FBXState> p_state, const String &p_material_name, const Vector<String> &p_keywords, int p_texture_type) const;
 	void _process_uv_set(PackedVector2Array &uv_array);
 	void _zero_unused_elements(Vector<float> &cur_custom, int start, int end, int num_channels);
 	Error _parse_scenes(Ref<FBXState> p_state);
