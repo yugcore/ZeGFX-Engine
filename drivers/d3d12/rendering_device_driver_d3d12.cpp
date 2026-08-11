@@ -36,6 +36,7 @@
 #include "drivers/d3d12/d3d12_hooks.h"
 #include "drivers/d3d12/d3d12_pipeline_state_manager.h"
 #include "drivers/d3d12/rendering_context_driver_d3d12.h"
+#include "drivers/d3d12/zegfx_d3d12_bridge.h"
 
 #include <drivers/d3d12/godot_d3d12ma.h>
 #include <drivers/d3d12/godot_nir.h>
@@ -6414,6 +6415,10 @@ Error RenderingDeviceDriverD3D12::initialize(uint32_t p_device_index, uint32_t p
 
 	err = _initialize_command_signatures();
 	ERR_FAIL_COND_V(err != OK, ERR_CANT_CREATE);
+
+	if (ZeGFXD3D12Bridge::get_singleton()) {
+		ZeGFXD3D12Bridge::get_singleton()->initialize_device(device.Get());
+	}
 
 	return OK;
 }

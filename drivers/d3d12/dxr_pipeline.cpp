@@ -16,23 +16,25 @@ DXRPipelineD3D12::~DXRPipelineD3D12() {
 
 bool DXRPipelineD3D12::initialize(ID3D12Device* p_device) {
     shutdown();
+    if (!p_device) return false;
     device = p_device;
-    if (!device) return false;
 
-    // Query ID3D12Device5 for DXR tier support
-    if (FAILED(device->QueryInterface(IID_PPV_ARGS(&device5)))) {
-        std::cout << "[ZeGFX D3D12] Hardware Ray Tracing (DXR 1.1) interface query skipped." << std::endl;
-        return false;
-    }
-
-    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
-    if (SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))) &&
-        options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
-        dxr_supported = true;
-        std::cout << "[ZeGFX D3D12] Hardware Ray Tracing (DXR 1.1) active on GPU." << std::endl;
+    ID3D12Device5* p_dev5 = nullptr;
+    HRESULT hr = device->QueryInterface(IID_PPV_ARGS(&p_dev5));
+    if (SUCCEEDED(hr) && p_dev5) {
+        device5 = p_dev5;
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
+        if (SUCCEEDED(device5->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))) &&
+            options5.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED) {
+            dxr_supported = true;
+            std::cout << "[ZeGFX D3D12] Hardware Ray Tracing (DXR 1.1) active on GPU." << std::endl;
+        } else {
+            dxr_supported = false;
+            std::cout << "[ZeGFX D3D12] DXR Hardware Ray Tracing not available; compute fallback active." << std::endl;
+        }
     } else {
         dxr_supported = false;
-        std::cout << "[ZeGFX D3D12] DXR Hardware Ray Tracing not available; compute fallback active." << std::endl;
+        std::cout << "[ZeGFX D3D12] Hardware Ray Tracing (DXR 1.1) interface query skipped." << std::endl;
     }
 
     initialized = true;
@@ -40,8 +42,6 @@ bool DXRPipelineD3D12::initialize(ID3D12Device* p_device) {
 }
 
 void DXRPipelineD3D12::shutdown() {
-    if (!initialized) return;
-
     if (rtx_state_object) {
         rtx_state_object->Release();
         rtx_state_object = nullptr;

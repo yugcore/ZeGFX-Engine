@@ -5,7 +5,7 @@
 #ifdef WITH_DX12_BACKEND
 
 #include "post_composite.h"
-#include "ZeGFX/include/final_image_settings.h"
+#include "final_image_settings.h"
 #include <iostream>
 
 namespace zegfx {
@@ -60,8 +60,6 @@ bool PostCompositeD3D12::initialize(ID3D12Device* p_device) {
 }
 
 void PostCompositeD3D12::shutdown() {
-    if (!initialized) return;
-
     if (ao_system) { delete ao_system; ao_system = nullptr; }
     if (ssr_system) { delete ssr_system; ssr_system = nullptr; }
     if (bloom_system) { delete bloom_system; bloom_system = nullptr; }
