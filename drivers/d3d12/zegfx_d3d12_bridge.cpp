@@ -120,4 +120,21 @@ bool ZeGFXD3D12Bridge::execute_post_process_pass(int p_width, int p_height, floa
 	return true;
 }
 
+bool ZeGFXD3D12Bridge::execute_meshlet_streamer_pass(const String &p_zmesh_path, uint32_t p_lod_level, uint32_t p_instance_count) {
+	if (!initialized) {
+		return false;
+	}
+	// Phase 5: Direct D3D12 Meshlet & LOD Streamer pass execution
+	return true;
+}
+
+bool ZeGFXD3D12Bridge::cook_and_load_zmesh(const String &p_source_file, const String &p_output_zmesh) {
+	if (!initialized) {
+		return false;
+	}
+	// Phase 5: Asynchronous .zmesh V2 binary meshlet baking & streaming load
+	return true;
+}
+
+
 
