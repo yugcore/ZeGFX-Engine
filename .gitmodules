@@ -1,0 +1,3 @@
+[submodule "ZeGFX"]
+	path = ZeGFX
+	url = https://github.com/yugcore/ZeGFX.git
