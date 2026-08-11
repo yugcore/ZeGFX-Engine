@@ -7121,8 +7121,6 @@ void EditorNode::_dropped_files(const Vector<String> &p_files) {
 
 	_add_dropped_files_recursive(p_files, to_path);
 
-	EditorFileSystem::get_singleton()->scan_changes();
-
 	List<String> importer_exts;
 	ResourceImporterScene::get_scene_importer_extensions(&importer_exts);
 
@@ -7141,7 +7139,9 @@ void EditorNode::_dropped_files(const Vector<String> &p_files) {
 	}
 
 	if (!first_3d_file.is_empty()) {
-		callable_mp(SceneImportSettingsDialog::get_singleton(), &SceneImportSettingsDialog::open_settings).call_deferred(first_3d_file, String("PackedScene"));
+		SceneImportSettingsDialog::get_singleton()->open_settings(first_3d_file);
+	} else {
+		EditorFileSystem::get_singleton()->scan_changes();
 	}
 }
 
