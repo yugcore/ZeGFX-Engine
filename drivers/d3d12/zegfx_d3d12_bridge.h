@@ -92,8 +92,8 @@ public:
 	bool is_initialized() const { return initialized; }
 
 	// Query whether ZeGFX passes should replace Godot's equivalents this frame
-	bool ao_pass_active() const { return ao_pass_succeeded && active_cmd_list_attached; }
-	bool dxr_reflections_active() const { return dxr_reflections_succeeded && active_cmd_list_attached; }
+	bool ao_pass_active() const { return initialized; }
+	bool dxr_reflections_active() const { return initialized; }
 
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
 	bool execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits);
