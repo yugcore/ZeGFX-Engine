@@ -1,0 +1,167 @@
+# ZeGFX Full Subsystem Audit — Honest Status Report
+
+> [!CAUTION]
+> This audit uses three honest tiers. **"Wired"** means Godot's rendering loop literally calls a bridge method. But **"wired" does NOT mean "doing GPU work"** — most bridge methods log a message and `return true`. This distinction matters.
+
+---
+
+## Classification Legend
+
+| Symbol | Meaning |
+|:---:|:---|
+| 🟢 | **WIRED & EXECUTING** — Godot calls it AND it does real work (math, COM queries, GPU dispatch) |
+| 🟡 | **WIRED BUT HOLLOW** — Godot calls bridge method, but method body is `print_verbose(); return true;` — no GPU work |
+| 🔴 | **COMPLETELY UNWIRED** — No bridge method, no Godot callsite, ZeGFX code exists but is never invoked |
+
+---
+
+## Tier 1: WIRED & EXECUTING (Actually Does Something) 🟢
+
+### 1. Bridge Singleton Lifecycle
+- **What it does**: Creates `ZeGFXD3D12Bridge` singleton, queries `ID3D12Device5` for DXR 1.1 support, initializes `PostCompositeD3D12` subsystems.
+- **Godot callsite**: [rendering_context_driver_d3d12.cpp:234](file:///z:/ZeGFX-Engine/drivers/d3d12/rendering_context_driver_d3d12.cpp#L234) → `memnew(ZeGFXD3D12Bridge)`
+- **Godot callsite**: [rendering_device_driver_d3d12.cpp:6419](file:///z:/ZeGFX-Engine/drivers/d3d12/rendering_device_driver_d3d12.cpp#L6419) → `initialize_device(device.Get())`
+- **Real work**: COM `QueryInterface` for `ID3D12Device5`, `CheckFeatureSupport` for DXR tier, allocates 5 post-processing subsystem objects.
+
+### 2. Directional Shadow Cascade Splits
+- **What it does**: Computes PSSM logarithmic/linear cascade split distances and **overwrites Godot's split values**.
+- **Bridge method**: `execute_shadow_pass()` — does actual math (log/linear blend), writes to `r_splits` output.
+- **Godot callsite**: [renderer_scene_cull.cpp:2191](file:///z:/ZeGFX-Engine/servers/rendering/renderer_scene_cull.cpp#L2191) — overrides `distances[]` array.
+- **Real work**: ✅ Actually changes shadow cascade split positions in the engine.
+
+### 3. Asset Cooker Import Hook
+- **What it does**: Calls `zegfx::cooker::AssetCooker::CookMesh()` to bake `.gltf`/`.fbx` into `.zmesh` V2 binary meshlets.
+- **Godot callsite**: [resource_importer_scene.cpp:3311](file:///z:/ZeGFX-Engine/editor/import/3d/resource_importer_scene.cpp#L3311)
+- **Real work**: ✅ Actually invokes the 67 KB asset cooker with Forsyth optimization.
+- **Note**: Only triggers when user selects `IMPORT_MODE_ZEGFX_COOKED` in import settings.
+
+### 4. DXR Device Feature Query
+- **What it does**: `DXRPipelineD3D12::initialize()` queries GPU for DXR 1.1 hardware ray-tracing support.
+- **Real work**: ✅ Actual COM `QueryInterface` + `CheckFeatureSupport`. Prints whether DXR is available.
+- **Note**: `build_tlas()` and `dispatch_rays()` are implemented but **never called** from anywhere.
+
+---
+
+## Tier 2: WIRED BUT HOLLOW (Called, But Does Nothing) 🟡
+
+### 5. Ambient Occlusion Pass
+- **Bridge method**: `execute_ao_pass(width, height, radius, intensity)`
+- **Godot callsite**: [render_forward_clustered.cpp:1438](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp#L1438)
+- **Method body**: `print_verbose(...); return true;` — **no GPU work**, no ZeGFX `AmbientOcclusionSystem` invoked.
+
+### 6. DXR Reflections Pass
+- **Bridge method**: `execute_dxr_reflections_pass(width, height, roughness)`
+- **Godot callsite**: [render_forward_clustered.cpp:1503](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.cpp#L1503)
+- **Method body**: `print_verbose(...); return (dxr_pipeline && dxr_pipeline->is_dxr_supported());` — **no ray dispatch**, just checks bool.
+
+### 7. Post-Processing Pass
+- **Bridge method**: `execute_post_process_pass(width, height, exposure, bloom, tonemap, sharpen, vignette)`
+- **Godot callsite**: [renderer_scene_render_rd.cpp:484](file:///z:/ZeGFX-Engine/servers/rendering/renderer_rd/renderer_scene_render_rd.cpp#L484)
+- **Method body**: Creates a `FinalImageSettings` struct, sets its fields, then **discards it** — never passed to `PostCompositeD3D12::execute_post_processing_chain()`.
+
+### 8. Meshlet Streamer Pass
+- **Bridge method**: `execute_meshlet_streamer_pass(path, lod, instance_count)`
+- **Godot callsite**: **NONE** — method exists in bridge but is never called from anywhere.
+- **Method body**: `print_verbose(...); return true;`
+
+### 9. Cook & Load `.zmesh`
+- **Bridge method**: `cook_and_load_zmesh(source, output)`
+- **Godot callsite**: **NONE** — method exists but is never called. (The actual cook happens via `AssetCooker` in `resource_importer_scene.cpp`, bypassing this method.)
+- **Method body**: `print_verbose(...); return true;`
+
+---
+
+## Tier 3: COMPLETELY UNWIRED (ZeGFX Code Exists, Zero Integration) 🔴
+
+### 10. DX12 Render Graph Engine (120 KB)
+- **ZeGFX files**: [dx12_render_graph.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/dx12_render_graph.cpp) (120 KB), [pipeline_orchestrator.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/core/pipeline_orchestrator.cpp)
+- **Features**: Automatic GPU barrier insertion, transient memory pool, async compute, pass sorting.
+- **Status**: Compiles via SCsub but **never instantiated or called**.
+
+### 11. DX12 Backend Frame Renderer (120 KB)
+- **ZeGFX files**: [dx12_backend_frame.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/dx12_backend_frame.cpp) (120 KB), [dx12_backend_core.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/dx12_backend_core.cpp) (86 KB)
+- **Features**: Full standalone D3D12 rendering frame loop with GPU scene buffer management.
+- **Status**: **Never instantiated**. This is ZeGFX's own independent renderer.
+
+### 12. GPU Scene & Light Grid
+- **ZeGFX files**: [gpu_scene.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/gpu_scene.cpp), [zgpu_scene.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/zgpu_scene.cpp), [light_grid_manager.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/light_grid_manager.cpp)
+- **Features**: GPU-driven scene buffer for 10K+ dynamic lights, 3D light grid clustering.
+- **Status**: **Never instantiated**.
+
+### 13. Virtual Shadow Maps (VSM)
+- **ZeGFX files**: [vsm.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/vsm.cpp), [shadow_pages.h](file:///z:/ZeGFX-Engine/ZeGFX/include/shadow_pages.h) (15 KB)
+- **Features**: Physical page table for unlimited virtual shadow resolution.
+- **Status**: **Never instantiated**.
+
+### 14. Virtual Geometry / Nanite Meshlets (GPU Culling & Draw)
+- **ZeGFX files**: [virtual_geometry.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/virtual_geometry.cpp), [zmesh_submission.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/zmesh_submission.cpp) (10 KB)
+- **Features**: GPU frustum/occlusion/backface cluster culling, `ExecuteIndirect` multi-draw.
+- **Status**: **Never instantiated**. `GPUCommandQueueD3D12` compiles but is never called from bridge.
+
+### 15. Global Illumination (ZGI Radiance Probes)
+- **ZeGFX files**: [gi_system.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/global_illumination/gi_system.cpp), [probe_volume.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/global_illumination/probe_volume.cpp), [probe_scheduler.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/global_illumination/probe_scheduler.cpp)
+- **Features**: L2 spherical harmonics probes, async update scheduler.
+- **Status**: **Never instantiated**.
+
+### 16. Volumetric Froxel Fog
+- **ZeGFX files**: [volumetrics.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/dx12/volumetrics.cpp) (14 KB), [volumetrics_pass.cpp](file:///z:/ZeGFX-Engine/drivers/d3d12/volumetrics_pass.cpp)
+- **Features**: 3D froxel grid, light injection, volume integration. `VolumetricsPassD3D12` has real GPU dispatch code.
+- **Status**: **Compiles, has real code, but never instantiated from bridge or Godot**.
+
+### 17. Denoiser Pipeline
+- **ZeGFX files**: [ao_denoiser.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/denoise/ao_denoiser.cpp), [reflection_denoiser.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/denoise/reflection_denoiser.cpp), [shadow_denoiser.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/denoise/shadow_denoiser.cpp), [signal_history.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/denoise/signal_history.cpp)
+- **Features**: Spatiotemporal denoisers for AO, reflections, and shadows.
+- **Status**: **Never instantiated**.
+
+### 18. GPU Terrain Clipmap System
+- **ZeGFX files**: [terrain_system.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/terrain_system.cpp) (17 KB), [heightmap_importer.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/heightmap_importer.cpp) (22 KB)
+- **Features**: GPU clipmap tessellation, 16-layer splatmap, terrain LOD.
+- **Status**: **Never instantiated**.
+
+### 19. Physics Engine
+- **ZeGFX files**: [physics_world.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/physics/physics_world.cpp) (11 KB), [contact_solver.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/physics/solver/contact_solver.cpp) (11 KB), [dynamic_bvh.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/physics/broadphase/dynamic_bvh.cpp), [island_builder.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/physics/solver/island_builder.cpp)
+- **Features**: Full rigid body physics with BVH broadphase, contact solver, island sleeping.
+- **Status**: **Never instantiated**. Godot uses its own physics engine.
+
+### 20. ZeCoMod Procedural Modeling Language
+- **ZeGFX files**: [ZeGFX/src/zecomod/](file:///z:/ZeGFX-Engine/ZeGFX/src/zecomod/) — 16 files including `lexer.cpp`, `parser.cpp`, `evaluator.cpp`, `modifiers.cpp`, `primitives.cpp`, `exporters.cpp`
+- **Features**: Full procedural modeling DSL with lexer, parser, semantic analyzer, geometry modifiers, UV generation, `.zmesh` exporter.
+- **Status**: **Never instantiated**.
+
+### 21. Editor Overlay / Performance HUD
+- **ZeGFX files**: [editor_overlay.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/editor_overlay.cpp) (49 KB)
+- **Features**: VRAM budget inspector, render graph visualizer, light heatmaps, cluster debug views.
+- **Status**: **Never instantiated**.
+
+### 22. Shader Compiler & Hot Reload
+- **ZeGFX files**: [shader_compiler.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/shader_compiler.cpp) (30 KB), [shader_source.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/shader_source.cpp) (21 KB), [hot_reload.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/hot_reload.cpp) (13 KB)
+- **Features**: Runtime HLSL shader compilation, live hot reload with dependency tracking.
+- **Status**: **Never instantiated**. Godot uses its own shader system.
+
+### 23. World Partition & Streaming
+- **ZeGFX files**: [world_partition.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/packaging/world_partition.cpp), [streaming_manager.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/packaging/streaming_manager.cpp), [navmesh_streaming.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/packaging/navmesh_streaming.cpp)
+- **Features**: Open-world spatial grid streaming, NavMesh dynamic loading.
+- **Status**: **Never instantiated**.
+
+### 24. GPU Crash Diagnostics
+- **ZeGFX files**: [gpu_crash_diagnostics.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/diagnostics/gpu_crash_diagnostics.cpp), [render_capture.cpp](file:///z:/ZeGFX-Engine/ZeGFX/src/diagnostics/render_capture.cpp)
+- **Features**: GPU breadcrumb markers, frame capture API integration.
+- **Status**: **Never instantiated**.
+
+### 25. Atmosphere & Sky
+- **ZeGFX files**: [atmosphere_volume.h](file:///z:/ZeGFX-Engine/ZeGFX/include/atmosphere_volume.h) (27 KB)
+- **Features**: Rayleigh/Mie scattering, aerial perspective, procedural sky generation.
+- **Status**: **Never instantiated**.
+
+---
+
+## Summary Statistics
+
+| Tier | Count | What It Means |
+|:---:|:---:|:---|
+| 🟢 WIRED & EXECUTING | **4** | Actually changes engine behavior (shadow splits, DXR query, asset cook, lifecycle) |
+| 🟡 WIRED BUT HOLLOW | **5** | Godot calls bridge, but method just logs and returns true — zero GPU work |
+| 🔴 COMPLETELY UNWIRED | **16** | ZeGFX source exists and compiles, but is never instantiated or called |
+
+**Total ZeGFX source code**: ~2.5 MB of C++ across 100+ files
+**Actually doing work in Godot**: Shadow split math + DXR feature query + asset cooker = ~3 features

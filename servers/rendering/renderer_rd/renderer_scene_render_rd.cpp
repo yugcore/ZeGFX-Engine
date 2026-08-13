@@ -38,6 +38,7 @@
 #include "servers/rendering/renderer_rd/shaders/light_data_inc.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/scene_data_inc.glsl.gen.h"
 #include "servers/rendering/renderer_rd/storage_rd/particles_storage.h"
+#include "drivers/d3d12/zegfx_d3d12_bridge.h"
 #include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/rendering/rendering_server_enums.h"
@@ -468,6 +469,29 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 	bool can_use_effects = target_size.x >= 8 && target_size.y >= 8; // FIXME I think this should check internal size, we do all our post processing at this size...
 	can_use_effects &= _debug_draw_can_use_effects(debug_draw);
 	bool can_use_storage = _render_buffers_can_be_storage();
+
+	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized() && can_use_effects) {
+		float exposure = 1.0f;
+		float bloom_intensity = 0.0f;
+		int tonemap_mode = 0;
+		float sharpen = 0.0f;
+		float vignette = 0.0f;
+		if (p_render_data->environment.is_valid()) {
+			exposure = environment_get_exposure(p_render_data->environment);
+			bloom_intensity = environment_get_glow_intensity(p_render_data->environment);
+			tonemap_mode = (int)environment_get_tone_mapper(p_render_data->environment);
+		}
+		ZeGFXD3D12Bridge::get_singleton()->execute_post_process_pass(
+				target_size.x, target_size.y, exposure, bloom_intensity, tonemap_mode, sharpen, vignette);
+
+		// Flush all deferred ZeGFX render graph passes now that settings are finalized.
+		// D3D12 resource pointers are nullptr until RenderingDeviceDriverD3D12 provides
+		// a command list accessor — the render graph gracefully handles nullptr command lists.
+		ZeGFXD3D12Bridge::get_singleton()->flush_deferred_passes(
+				nullptr /*cmd_list*/, nullptr /*hdr_target*/, nullptr /*depth_target*/,
+				nullptr /*normal_target*/, nullptr /*output_target*/,
+				target_size.x, target_size.y, 0.016f /*delta_time ~60fps*/);
+	}
 
 	RSE::ViewportScaling3DMode scale_mode = rb->get_scaling_3d_mode();
 	bool use_upscaled_texture = rb->has_upscaled_texture() && (scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_FSR2 || scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_METALFX_TEMPORAL);

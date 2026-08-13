@@ -30,6 +30,7 @@
 
 #include "resource_importer_scene.h"
 #include "ZeGFX/include/cooker/asset_cooker.h"
+#include "drivers/d3d12/zegfx_d3d12_bridge.h"
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -3325,6 +3326,11 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 		zegfx::cooker::CookResult cook_res = cooker.CookMesh(global_src.utf8().get_data(), global_out.utf8().get_data());
 		if (cook_res.success) {
 			print_verbose(vformat("ZeGFX AssetCooker successfully baked '%s' -> '%s' (.zmesh V2)", src_path, cooked_output_path));
+
+			// Register the cooked asset with the bridge for runtime meshlet streaming.
+			if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+				ZeGFXD3D12Bridge::get_singleton()->cook_and_load_zmesh(global_src, global_out);
+			}
 		} else {
 			WARN_PRINT(vformat("ZeGFX AssetCooker failed for '%s' (%s). Automatically degrading to Native Import Mode.", src_path, String(cook_res.errorMessage.c_str())));
 		}

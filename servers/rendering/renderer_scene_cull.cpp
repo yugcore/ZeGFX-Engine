@@ -39,6 +39,7 @@
 #include "servers/rendering/rendering_light_culler.h"
 #include "servers/rendering/rendering_server.h"
 #include "servers/rendering/rendering_server_default.h"
+#include "drivers/d3d12/zegfx_d3d12_bridge.h"
 
 #ifndef XR_DISABLED
 #include "servers/xr/xr_interface.h"
@@ -2186,6 +2187,15 @@ void RendererSceneCull::_light_instance_setup_directional_shadow(int p_shadow_in
 	};
 
 	distances[splits] = max_distance;
+
+	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+		Vector<float> zegfx_splits;
+		if (ZeGFXD3D12Bridge::get_singleton()->execute_shadow_pass(min_distance, max_distance, splits, zegfx_splits)) {
+			for (int i = 0; i < zegfx_splits.size() && i < splits; i++) {
+				distances[i + 1] = zegfx_splits[i];
+			}
+		}
+	}
 
 	real_t texture_size = RSG::light_storage->get_directional_light_shadow_size(light->instance);
 

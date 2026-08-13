@@ -12,8 +12,15 @@
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
 
+#include <cstdint>
+
 class DXRPipelineD3D12;
 class PostCompositeD3D12;
+
+namespace zegfx {
+class RenderGraph;
+class ZPostProcessScheduler;
+} // namespace zegfx
 
 // Bridge singleton wiring ZeGFX subsystems into Godot's
 // RenderingDeviceDriverD3D12 while preserving 100% of editor UI & gizmos.
@@ -26,6 +33,52 @@ private:
 	DXRPipelineD3D12 *dxr_pipeline = nullptr;
 	PostCompositeD3D12 *post_composite = nullptr;
 
+	// --- Render graph subsystems (owned) ---
+	zegfx::RenderGraph *frame_render_graph = nullptr;
+	zegfx::ZPostProcessScheduler *post_scheduler = nullptr;
+
+	// --- Deferred AO pass state ---
+	struct PendingAO {
+		bool dirty = false;
+		int width = 0;
+		int height = 0;
+		float radius = 0.0f;
+		float intensity = 0.0f;
+	} pending_ao;
+
+	// --- Deferred DXR reflections state ---
+	struct PendingDXRReflections {
+		bool dirty = false;
+		int width = 0;
+		int height = 0;
+		float roughness = 0.0f;
+	} pending_dxr_reflections;
+
+	// --- Deferred post-process state ---
+	struct PendingPostProcess {
+		bool dirty = false;
+		int width = 0;
+		int height = 0;
+		float exposure = 1.0f;
+		float bloom_intensity = 0.0f;
+		int tonemap_mode = 0;
+		float sharpen = 0.0f;
+		float vignette = 0.0f;
+	} pending_post_process;
+
+	// --- Deferred meshlet streamer queue ---
+	struct PendingMeshletStream {
+		String zmesh_path;
+		uint32_t lod_level = 0;
+		uint32_t instance_count = 0;
+	};
+	Vector<PendingMeshletStream> pending_meshlet_streams;
+
+	// --- Track whether ZeGFX passes replaced Godot's this frame ---
+	bool ao_pass_succeeded = false;
+	bool dxr_reflections_succeeded = false;
+	bool active_cmd_list_attached = false;
+
 public:
 	static ZeGFXD3D12Bridge *get_singleton() { return singleton; }
 
@@ -37,6 +90,10 @@ public:
 	void shutdown();
 
 	bool is_initialized() const { return initialized; }
+
+	// Query whether ZeGFX passes should replace Godot's equivalents this frame
+	bool ao_pass_active() const { return ao_pass_succeeded && active_cmd_list_attached; }
+	bool dxr_reflections_active() const { return dxr_reflections_succeeded && active_cmd_list_attached; }
 
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
 	bool execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits);
@@ -53,6 +110,13 @@ public:
 	// Phase 5 Subsystem Swap: Cooked .zmesh V2 Meshlets & Dynamic LOD Streamer
 	bool execute_meshlet_streamer_pass(const String &p_zmesh_path, uint32_t p_lod_level, uint32_t p_instance_count);
 	bool cook_and_load_zmesh(const String &p_source_file, const String &p_output_zmesh);
+
+	// Called when a D3D12 command list is available to flush all deferred render graph passes.
+	// p_cmd_list: ID3D12GraphicsCommandList* (passed as void* to avoid D3D12 header dependency here).
+	// p_hdr_target, p_depth_target, p_normal_target, p_output_target: ID3D12Resource* for render graph I/O.
+	void flush_deferred_passes(void *p_cmd_list, void *p_hdr_target, void *p_depth_target,
+			void *p_normal_target, void *p_output_target,
+			int p_width, int p_height, float p_delta_time);
 };
 
 #endif // ZEGFX_D3D12_BRIDGE_H

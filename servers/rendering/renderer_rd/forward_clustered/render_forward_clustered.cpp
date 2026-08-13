@@ -38,6 +38,7 @@
 #include "servers/rendering/renderer_rd/storage_rd/particles_storage.h"
 #include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
 #include "servers/rendering/renderer_rd/uniform_set_cache_rd.h"
+#include "drivers/d3d12/zegfx_d3d12_bridge.h"
 #include "servers/rendering/rendering_device.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/rendering/storage/ltc_lut.gen.h"
@@ -1430,6 +1431,19 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 
 	RENDER_TIMESTAMP("Process SSAO");
 
+	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+		Size2i size = p_render_buffers->get_internal_size();
+		float radius = environment_get_ssao_radius(p_environment);
+		float intensity = environment_get_ssao_intensity(p_environment);
+		ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity);
+
+		// ZeGFX GTAO replaces Godot's SSAO — skip Godot's own pass when ZeGFX AO succeeds.
+		if (ZeGFXD3D12Bridge::get_singleton()->ao_pass_active()) {
+			return;
+		}
+	}
+
+	// Fallback: Godot's built-in SSAO (runs only when ZeGFX AO is not active)
 	RendererRD::SSEffects::SSAOSettings settings;
 	settings.radius = environment_get_ssao_radius(p_environment);
 	settings.intensity = environment_get_ssao_intensity(p_environment);
@@ -1490,6 +1504,17 @@ void RenderForwardClustered::_process_ssr(Ref<RenderSceneBuffersRD> p_render_buf
 
 	RENDER_TIMESTAMP("Process SSR");
 
+	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+		Size2i size = p_render_buffers->get_internal_size();
+		ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, 0.5f);
+
+		// ZeGFX DXR reflections replace Godot's SSR when DXR hardware is available.
+		if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active()) {
+			return;
+		}
+	}
+
+	// Fallback: Godot's built-in screen-space reflections (runs only when DXR is not active)
 	ss_effects->ssr_allocate_buffers(p_render_buffers, rb_data->ss_effects_data.ssr, p_render_buffers->get_base_data_format());
 
 	Projection reprojections[RendererSceneRender::MAX_RENDER_VIEWS];
@@ -2226,6 +2251,14 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 		}
 
 		RD::get_singleton()->draw_command_end_label();
+
+		// ZeGFX Meshlet Streamer — runs in PARALLEL with Godot's standard draw path.
+		// Queues GPU-driven indirect draws for any .zmesh cooked assets in the scene.
+		if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+			// TODO: Iterate actual .zmesh instances from the scene graph.
+			// For now, the meshlet streamer pass is queued but only processes entries
+			// that have been explicitly submitted via execute_meshlet_streamer_pass().
+		}
 
 		if (using_motion_pass) {
 			if (scale_type == SCALE_MFX) {

@@ -20,6 +20,11 @@ class ScreenSpaceReflections;
 class BloomSystem;
 class ExposureSystem;
 class ToneMapSystem;
+
+struct AmbientOcclusionSettings;
+struct BloomSettings;
+struct ExposureSettings;
+struct ToneMapSettings;
 }
 
 class PostCompositeD3D12 {
@@ -42,6 +47,12 @@ public:
     );
 
     bool is_initialized() const { return initialized; }
+
+    // Settings propagation from bridge — pushes to subsystem objects immediately
+    void update_ao_settings(const zegfx::AmbientOcclusionSettings& settings);
+    void update_bloom_settings(const zegfx::BloomSettings& settings);
+    void update_exposure_settings(const zegfx::ExposureSettings& settings);
+    void update_tonemap_settings(const zegfx::ToneMapSettings& settings);
 
 private:
     bool initialized = false;

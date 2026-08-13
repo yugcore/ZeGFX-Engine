@@ -2398,6 +2398,9 @@ RDD::FenceID RenderingDeviceDriverD3D12::fence_create() {
 
 Error RenderingDeviceDriverD3D12::fence_wait(FenceID p_fence) {
 	FenceInfo *fence = (FenceInfo *)(p_fence.id);
+	if (fence->d3d_fence->GetCompletedValue() >= fence->fence_value) {
+		return OK;
+	}
 	fence->d3d_fence->SetEventOnCompletion(fence->fence_value, fence->event_handle);
 	DWORD res = WaitForSingleObjectEx(fence->event_handle, INFINITE, FALSE);
 #ifdef PIX_ENABLED
