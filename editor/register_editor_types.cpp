@@ -69,6 +69,7 @@
 #include "editor/import/resource_importer_layered_texture.h"
 #include "editor/import/resource_importer_shader_file.h"
 #include "editor/import/resource_importer_svg.h"
+#include "editor/import/resource_importer_terrain_heightmap.h"
 #include "editor/import/resource_importer_texture.h"
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
@@ -106,6 +107,7 @@
 #include "editor/scene/3d/physics/physical_bone_3d_editor_plugin.h"
 #include "editor/scene/3d/polygon_3d_editor_plugin.h"
 #include "editor/scene/3d/skeleton_3d_editor_plugin.h"
+#include "editor/scene/3d/terrain_3d_editor_plugin.h"
 #include "editor/scene/3d/voxel_gi_editor_plugin.h"
 #include "editor/scene/curve_editor_plugin.h"
 #include "editor/scene/gradient_editor_plugin.h"
@@ -215,6 +217,7 @@ void register_editor_types() {
 	GDREGISTER_CLASS(ResourceImporterImage);
 	GDREGISTER_CLASS(ResourceImporterImageFont);
 	GDREGISTER_CLASS(ResourceImporterSVG);
+	GDREGISTER_CLASS(ResourceImporterTerrainHeightmap);
 	GDREGISTER_CLASS(ResourceImporterLayeredTexture);
 	GDREGISTER_CLASS(ResourceImporterOBJ);
 	GDREGISTER_CLASS(ResourceImporterScene);
@@ -289,6 +292,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<Path3DEditorPlugin>();
 	EditorPlugins::add_by_type<Polygon3DEditorPlugin>();
 	EditorPlugins::add_by_type<Skeleton3DEditorPlugin>();
+	EditorPlugins::add_by_type<Terrain3DEditorPlugin>();
 	EditorPlugins::add_by_type<VoxelGIEditorPlugin>();
 	// 3D physics editor plugins.
 	EditorPlugins::add_by_type<PhysicalBone3DEditorPlugin>();

@@ -106,6 +106,7 @@
 #include "editor/import/resource_importer_layered_texture.h"
 #include "editor/import/resource_importer_shader_file.h"
 #include "editor/import/resource_importer_svg.h"
+#include "editor/import/resource_importer_terrain_heightmap.h"
 #include "editor/import/resource_importer_texture.h"
 #include "editor/import/resource_importer_texture_atlas.h"
 #include "editor/import/resource_importer_wav.h"
@@ -8635,6 +8636,10 @@ EditorNode::EditorNode() {
 		Ref<ResourceImporterSVG> import_svg;
 		import_svg.instantiate();
 		ResourceFormatImporter::get_singleton()->add_importer(import_svg);
+
+		Ref<ResourceImporterTerrainHeightmap> import_terrain_heightmap;
+		import_terrain_heightmap.instantiate();
+		ResourceFormatImporter::get_singleton()->add_importer(import_terrain_heightmap);
 
 		Ref<ResourceImporterTextureAtlas> import_texture_atlas;
 		import_texture_atlas.instantiate();
