@@ -108,6 +108,8 @@
 #include "editor/scene/3d/polygon_3d_editor_plugin.h"
 #include "editor/scene/3d/skeleton_3d_editor_plugin.h"
 #include "editor/scene/3d/terrain_3d_editor_plugin.h"
+#include "editor/scene/3d/world_partition_3d_editor_plugin.h"
+#include "editor/scene/3d/floating_origin_3d_editor_plugin.h"
 #include "editor/scene/3d/voxel_gi_editor_plugin.h"
 #include "editor/scene/curve_editor_plugin.h"
 #include "editor/scene/gradient_editor_plugin.h"
@@ -127,6 +129,7 @@
 #include "editor/scene/texture/texture_editor_plugin.h"
 #include "editor/scene/texture/texture_layered_editor_plugin.h"
 #include "editor/scene/texture/texture_region_editor_plugin.h"
+#include "editor/scene/texture/virtual_texture_editor_plugin.h"
 #include "editor/script/editor_script.h"
 #include "editor/script/editor_script_plugin.h"
 #include "editor/script/script_editor_plugin.h"
@@ -252,6 +255,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<SubViewportPreviewEditorPlugin>();
 	EditorPlugins::add_by_type<Texture3DEditorPlugin>();
 	EditorPlugins::add_by_type<TextureEditorPlugin>();
+	EditorPlugins::add_by_type<VirtualTextureEditorPlugin>();
 	EditorPlugins::add_by_type<TextureLayeredEditorPlugin>();
 	EditorPlugins::add_by_type<TextureRegionEditorPlugin>();
 	EditorPlugins::add_by_type<ThemeEditorPlugin>();
@@ -293,6 +297,8 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<Polygon3DEditorPlugin>();
 	EditorPlugins::add_by_type<Skeleton3DEditorPlugin>();
 	EditorPlugins::add_by_type<Terrain3DEditorPlugin>();
+	EditorPlugins::add_by_type<WorldPartition3DEditorPlugin>();
+	EditorPlugins::add_by_type<FloatingOrigin3DEditorPlugin>();
 	EditorPlugins::add_by_type<VoxelGIEditorPlugin>();
 	// 3D physics editor plugins.
 	EditorPlugins::add_by_type<PhysicalBone3DEditorPlugin>();

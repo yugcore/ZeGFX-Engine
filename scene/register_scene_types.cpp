@@ -136,6 +136,7 @@
 #include "scene/resources/gradient.h"
 #include "scene/resources/gradient_texture.h"
 #include "scene/resources/image_texture.h"
+#include "scene/resources/virtual_texture_2d.h"
 #include "scene/resources/immediate_mesh.h"
 #include "scene/resources/label_settings.h"
 #include "scene/resources/material.h"
@@ -238,6 +239,7 @@
 #include "scene/3d/cpu_particles_3d.h"
 #include "scene/3d/decal.h"
 #include "scene/3d/fabr_ik_3d.h"
+#include "scene/3d/floating_origin_3d.h"
 #include "scene/3d/fog_volume.h"
 #include "scene/3d/gpu_particles_3d.h"
 #include "scene/3d/gpu_particles_collision_3d.h"
@@ -259,6 +261,7 @@
 #include "scene/3d/occluder_instance_3d.h"
 #include "scene/3d/path_3d.h"
 #include "scene/3d/terrain_3d.h"
+#include "scene/3d/world_partition_3d.h"
 #include "scene/3d/reflection_probe.h"
 #include "scene/3d/remote_transform_3d.h"
 #include "scene/3d/retarget_modifier_3d.h"
@@ -637,6 +640,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioListener3D);
 	GDREGISTER_CLASS(MeshInstance3D);
 	GDREGISTER_CLASS(Terrain3D);
+	GDREGISTER_CLASS(WorldPartition3D);
+	GDREGISTER_CLASS(FloatingOrigin3D);
 #ifndef DISABLE_DEPRECATED
 	MeshInstance3D::use_parent_skeleton_compat = GLOBAL_GET("animation/compatibility/default_parent_skeleton_in_mesh_instance_3d");
 #endif
@@ -939,6 +944,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(CompressedTexture2D);
 	GDREGISTER_CLASS(PortableCompressedTexture2D);
 	GDREGISTER_CLASS(ImageTexture);
+	GDREGISTER_CLASS(VirtualTexture2D);
 	GDREGISTER_CLASS(AtlasTexture);
 	GDREGISTER_CLASS(MeshTexture);
 	GDREGISTER_CLASS(CurveTexture);
