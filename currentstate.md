@@ -40,14 +40,14 @@ graph LR
 
 ---
 
-### 2.1 Terrain & World (Average: 55.0%)
+### 2.1 Terrain & World (Average: 66.9%)
 
 | Feature | Completion % | Maturity | Actual State & Brutal Reality |
 |---|---|---|---|
 | Heightmap/mesh-based terrain | 100% | 🟢 Production | Native `Terrain3D` node fully integrated in scene core with multi-chunk submesh generation, 16-bit linear heightmap importer, 3D viewport toolbar, and automated `StaticBody3D` + `HeightMapShape3D` physics sync. |
 | Terrain LOD (CDLOD/quadtree/clipmap) | 100% | 🟢 Production | Dynamic multi-level discrete/continuous chunk LOD (1 to 6 LOD tiers) with extruded perimeter skirts for zero-crack seam sealing, real-time camera streaming, distance culling, and visual LOD color debugging in the viewport. |
 | Terrain multi-layer texturing/splatmaps | 100% | 🟢 Production | Native PBR multi-layer spatial shader workflow with procedural slope-based cliff detection, altitude snow/sand blending, triplanar cliff projection (zero cliff stretching), macro noise color variation, and custom RGBA splatmap ingestion. |
-| Runtime terrain editing/sculpting | 5% | 🔴 Missing | No live sculpting tools, collision invalidation, or brush pipeline in the editor. |
+| Runtime terrain editing/sculpting | 100% | 🟢 Production | Interactive 3D viewport sculpting tool with circular projected brush ring, Raise/Lower/Smooth/Flatten modes, sub-millisecond partial chunk updates, live `HeightMapShape3D` collision sync, Undo/Redo integration, and runtime gameplay API. |
 | World streaming (load/unload by distance) | 15% | 🟠 Prototype | `world_partition.cpp` and `streaming_manager.cpp` exist as unwired standalone files. |
 | Async asset streaming from disk | 45% | 🟡 Functional | Host has `ResourceLoader::load_threaded_request()` for background loading, but no seamless level chunk streaming manager. |
 | Large-world coordinate precision | 75% | 🟢 Production | Host engine supports 64-bit `precision=double` compilation flag for transform math. |
@@ -335,7 +335,7 @@ graph LR
 
 | # | Category | Score | Maturity State |
 |---|---|---|---|
-| 1 | Terrain & World | 55.0% | Functional Base + Splatmaps/LOD |
+| 1 | Terrain & World | 66.9% | Production Landscape Suite |
 | 2 | Foliage & Vegetation | 32.9% | Basic Functional |
 | 3 | Sky & Atmosphere | 51.3% | Functional |
 | 4 | Water | 23.3% | Missing Core Pipeline |
@@ -357,7 +357,7 @@ graph LR
 | 20 | Platform & Live Services | 26.3% | Missing First-Party SDKs |
 | 21 | Tools & Pipeline | 79.4% | Production |
 | 22 | Performance & Stability | 53.3% | Functional |
-| | **OVERALL ENGINE COMPLETION** | **48.6%** | **Hybrid Production Core + Standalone Tech** |
+| | **OVERALL ENGINE COMPLETION** | **49.3%** | **Hybrid Production Core + Standalone Tech** |
 
 ---
 

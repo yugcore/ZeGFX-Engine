@@ -56,6 +56,13 @@ public:
 		RESAMPLE_BOX,
 	};
 
+	enum BrushMode {
+		BRUSH_RAISE,
+		BRUSH_LOWER,
+		BRUSH_SMOOTH,
+		BRUSH_FLATTEN,
+	};
+
 	struct TerrainChunk {
 		int chunk_x = 0;
 		int chunk_z = 0;
@@ -160,6 +167,7 @@ private:
 	void _load_heightmap_data();
 	void _build_chunk_meshes();
 	Ref<ArrayMesh> _create_chunk_lod_mesh(int cx, int cz, int p_lod, AABB &r_aabb);
+	void _rebuild_chunk(int cx, int cz);
 	void _update_lod(const Vector3 &p_camera_pos);
 	void _update_materials();
 	void _update_lod_materials();
@@ -172,8 +180,8 @@ private:
 	float _get_height_raw(int x, int z) const;
 	Vector3 _calc_normal(int x, int z) const;
 
-	static Vector<Ref<StandardMaterial3D>> debug_lod_materials;
-	static void _init_debug_materials();
+	Vector<Ref<StandardMaterial3D>> debug_lod_materials;
+	void _init_debug_materials();
 
 protected:
 	void _notification(int p_what);
@@ -319,6 +327,18 @@ public:
 	void set_show_chunk_bounds(bool p_show);
 	bool is_show_chunk_bounds() const;
 
+	// Sculpting & Editing
+	void sculpt(const Vector3 &p_world_pos, float p_radius, float p_strength, BrushMode p_mode, float p_target_height = 0.0f);
+	void sculpt_grid(int p_gx, int p_gz, float p_grid_radius, float p_strength, BrushMode p_mode, float p_target_height = 0.0f);
+	void set_height_at_grid(int p_x, int p_z, float p_height);
+	void update_chunks_in_region(int p_min_gx, int p_min_gz, int p_max_gx, int p_max_gz);
+
+	Vector<float> get_heights_raw() const { return heights; }
+	void set_heights_raw(const Vector<float> &p_heights) {
+		heights = p_heights;
+		rebuild_terrain();
+	}
+
 	// Actions & Queries
 	void rebuild_terrain();
 	void bake_collision();
@@ -340,3 +360,4 @@ public:
 };
 
 VARIANT_ENUM_CAST(Terrain3D::ResampleFilter);
+VARIANT_ENUM_CAST(Terrain3D::BrushMode);

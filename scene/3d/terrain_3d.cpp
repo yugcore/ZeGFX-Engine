@@ -42,8 +42,6 @@
 
 #include <cmath>
 
-Vector<Ref<StandardMaterial3D>> Terrain3D::debug_lod_materials;
-
 void Terrain3D::_init_debug_materials() {
 	if (!debug_lod_materials.is_empty()) return;
 
@@ -515,7 +513,7 @@ Ref<ArrayMesh> Terrain3D::_create_chunk_lod_mesh(int cx, int cz, int p_lod, AABB
 		}
 	}
 
-	// Perimeter Skirts (Drop borders to hide T-junction cracks across LOD seams)
+	// Perimeter Skirts
 	if (skirt_height > 0.0f) {
 		auto add_skirt_edge = [&](int i0, int i1) {
 			Vector3 p0 = vertices[i0];
@@ -580,6 +578,43 @@ Ref<ArrayMesh> Terrain3D::_create_chunk_lod_mesh(int cx, int cz, int p_lod, AABB
 
 	mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
 	return mesh;
+}
+
+void Terrain3D::_rebuild_chunk(int cx, int cz) {
+	for (int i = 0; i < chunks.size(); ++i) {
+		TerrainChunk &tc = chunks.write[i];
+		if (tc.chunk_x == cx && tc.chunk_z == cz && tc.mesh_instance) {
+			int total_lods = CLAMP(lod_count, 1, 6);
+			tc.lod_meshes.clear();
+			AABB chunk_aabb;
+			for (int l = 0; l < total_lods; ++l) {
+				Ref<ArrayMesh> lod_m = _create_chunk_lod_mesh(cx, cz, l, chunk_aabb);
+				if (lod_m.is_valid()) {
+					tc.lod_meshes.push_back(lod_m);
+				}
+			}
+			tc.aabb = chunk_aabb;
+			if (!tc.lod_meshes.is_empty()) {
+				int cur_lod = CLAMP(tc.current_lod, 0, tc.lod_meshes.size() - 1);
+				tc.mesh_instance->set_mesh(tc.lod_meshes[cur_lod]);
+			}
+			return;
+		}
+	}
+}
+
+void Terrain3D::update_chunks_in_region(int p_min_gx, int p_min_gz, int p_max_gx, int p_max_gz) {
+	int base_step = MAX(4, chunk_size);
+	int min_cx = MAX(0, (p_min_gx - 1) / base_step);
+	int max_cx = (p_max_gx + 1) / base_step;
+	int min_cz = MAX(0, (p_min_gz - 1) / base_step);
+	int max_cz = (p_max_gz + 1) / base_step;
+
+	for (int cz = min_cz; cz <= max_cz; ++cz) {
+		for (int cx = min_cx; cx <= max_cx; ++cx) {
+			_rebuild_chunk(cx, cz);
+		}
+	}
 }
 
 void Terrain3D::_build_chunk_meshes() {
@@ -744,6 +779,96 @@ void Terrain3D::rebuild_terrain() {
 
 void Terrain3D::bake_collision() {
 	_sync_physics();
+}
+
+void Terrain3D::set_height_at_grid(int p_x, int p_z, float p_height) {
+	if (p_x < 0 || p_x >= map_width || p_z < 0 || p_z >= map_height || heights.is_empty()) return;
+	float norm_h = height_scale > 0.001f ? (p_height / height_scale) : 0.0f;
+	heights.write[p_z * map_width + p_x] = norm_h;
+	update_chunks_in_region(p_x, p_z, p_x, p_z);
+	_sync_physics();
+}
+
+void Terrain3D::sculpt(const Vector3 &p_world_pos, float p_radius, float p_strength, BrushMode p_mode, float p_target_height) {
+	if (map_width < 2 || map_height < 2 || heights.is_empty() || cell_size <= 0.0f) return;
+
+	Transform3D xform = is_inside_tree() ? get_global_transform() : get_transform();
+	Vector3 local_pos = xform.affine_inverse().xform(p_world_pos);
+
+	float origin_x = center_pivot ? -(map_width - 1) * cell_size * 0.5f : 0.0f;
+	float origin_z = center_pivot ? -(map_height - 1) * cell_size * 0.5f : 0.0f;
+
+	int center_gx = (int)Math::round((local_pos.x - origin_x) / cell_size);
+	int center_gz = (int)Math::round((local_pos.z - origin_z) / cell_size);
+	float grid_r = p_radius / cell_size;
+
+	sculpt_grid(center_gx, center_gz, grid_r, p_strength, p_mode, p_target_height);
+}
+
+void Terrain3D::sculpt_grid(int p_gx, int p_gz, float p_grid_radius, float p_strength, BrushMode p_mode, float p_target_height) {
+	if (map_width < 2 || map_height < 2 || heights.is_empty() || p_grid_radius <= 0.0f) return;
+
+	int r_int = (int)Math::ceil(p_grid_radius);
+	int min_gx = MAX(0, p_gx - r_int);
+	int max_gx = MIN(map_width - 1, p_gx + r_int);
+	int min_gz = MAX(0, p_gz - r_int);
+	int max_gz = MIN(map_height - 1, p_gz + r_int);
+
+	if (min_gx > max_gx || min_gz > max_gz) return;
+
+	float r2 = p_grid_radius * p_grid_radius;
+
+	for (int z = min_gz; z <= max_gz; ++z) {
+		for (int x = min_gx; x <= max_gx; ++x) {
+			float dx = (float)(x - p_gx);
+			float dz = (float)(z - p_gz);
+			float d2 = dx * dx + dz * dz;
+			if (d2 > r2) continue;
+
+			float d = Math::sqrt(d2);
+			float t = d / p_grid_radius;
+			float falloff = 1.0f - t;
+			falloff = falloff * falloff * (3.0f - 2.0f * falloff);
+			float delta = falloff * p_strength;
+
+			int idx = z * map_width + x;
+			float current_h = heights[idx] * height_scale;
+
+			switch (p_mode) {
+				case BRUSH_RAISE: {
+					current_h += delta * 0.1f;
+				} break;
+				case BRUSH_LOWER: {
+					current_h -= delta * 0.1f;
+				} break;
+				case BRUSH_SMOOTH: {
+					int x_prev = MAX(0, x - 1);
+					int x_next = MIN(map_width - 1, x + 1);
+					int z_prev = MAX(0, z - 1);
+					int z_next = MIN(map_height - 1, z + 1);
+
+					float avg = (
+						heights[z_prev * map_width + x_prev] + heights[z_prev * map_width + x] + heights[z_prev * map_width + x_next] +
+						heights[z * map_width + x_prev] + heights[idx] + heights[z * map_width + x_next] +
+						heights[z_next * map_width + x_prev] + heights[z_next * map_width + x] + heights[z_next * map_width + x_next]
+					) / 9.0f * height_scale;
+
+					float diff = avg - current_h;
+					float step = SIGN(diff) * MIN(Math::abs(diff), delta * 0.1f);
+					current_h += step;
+				} break;
+				case BRUSH_FLATTEN: {
+					float diff = p_target_height - current_h;
+					float step = SIGN(diff) * MIN(Math::abs(diff), delta * 0.1f);
+					current_h += step;
+				} break;
+			}
+
+			heights.write[idx] = height_scale > 0.001f ? (current_h / height_scale) : 0.0f;
+		}
+	}
+
+	update_chunks_in_region(min_gx, min_gz, max_gx, max_gz);
 }
 
 float Terrain3D::sample_height(const Vector3 &p_world_pos) const {
@@ -1431,6 +1556,14 @@ void Terrain3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_triplanar_cliffs", "enabled"), &Terrain3D::set_triplanar_cliffs);
 	ClassDB::bind_method(D_METHOD("is_triplanar_cliffs"), &Terrain3D::is_triplanar_cliffs);
 
+	// Sculpting Methods
+	ClassDB::bind_method(D_METHOD("sculpt", "world_pos", "radius", "strength", "mode", "target_height"), &Terrain3D::sculpt, DEFVAL(0.0f));
+	ClassDB::bind_method(D_METHOD("sculpt_grid", "gx", "gz", "grid_radius", "strength", "mode", "target_height"), &Terrain3D::sculpt_grid, DEFVAL(0.0f));
+	ClassDB::bind_method(D_METHOD("set_height_at_grid", "x", "z", "height"), &Terrain3D::set_height_at_grid);
+	ClassDB::bind_method(D_METHOD("update_chunks_in_region", "min_gx", "min_gz", "max_gx", "max_gz"), &Terrain3D::update_chunks_in_region);
+	ClassDB::bind_method(D_METHOD("get_heights_raw"), &Terrain3D::get_heights_raw);
+	ClassDB::bind_method(D_METHOD("set_heights_raw", "heights"), &Terrain3D::set_heights_raw);
+
 	ClassDB::bind_method(D_METHOD("set_material", "material"), &Terrain3D::set_material);
 	ClassDB::bind_method(D_METHOD("get_material"), &Terrain3D::get_material);
 
@@ -1540,4 +1673,9 @@ void Terrain3D::_bind_methods() {
 	BIND_ENUM_CONSTANT(RESAMPLE_BILINEAR);
 	BIND_ENUM_CONSTANT(RESAMPLE_BICUBIC);
 	BIND_ENUM_CONSTANT(RESAMPLE_BOX);
+
+	BIND_ENUM_CONSTANT(BRUSH_RAISE);
+	BIND_ENUM_CONSTANT(BRUSH_LOWER);
+	BIND_ENUM_CONSTANT(BRUSH_SMOOTH);
+	BIND_ENUM_CONSTANT(BRUSH_FLATTEN);
 }
