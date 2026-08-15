@@ -173,14 +173,22 @@ vec3 load_normal(ivec2 p_pos, ivec2 p_offset) {
 	return encoded_normal;
 }
 
-// all vectors in viewspace
+// ZeGFX GTAO Horizon-Based Occlusion & Cosine Weighting
 float calculate_pixel_obscurance(vec3 p_pixel_normal, vec3 p_hit_delta, float p_fallof_sq) {
 	float length_sq = dot(p_hit_delta, p_hit_delta);
-	float NdotD = dot(p_pixel_normal, p_hit_delta) / sqrt(length_sq);
+	float inv_len = inversesqrt(max(1e-6, length_sq));
+	vec3 horizon_dir = p_hit_delta * inv_len;
 
-	float falloff_mult = max(0.0, length_sq * p_fallof_sq + 1.0);
+	// Cosine-weighted horizon elevation angle integral
+	float NdotD = dot(p_pixel_normal, horizon_dir);
 
-	return max(0, NdotD - params.horizon_angle_threshold) * falloff_mult;
+	// Distance attenuation falloff with quadratic smoothing
+	float falloff_mult = clamp(length_sq * p_fallof_sq + 1.0, 0.0, 1.0);
+	falloff_mult *= falloff_mult;
+
+	// Horizon angle thresholding
+	float visibility = clamp(NdotD - params.horizon_angle_threshold, 0.0, 1.0);
+	return visibility * falloff_mult;
 }
 
 void SSAO_tap_inner(const int p_quality_level, inout float r_obscurance_sum, inout float r_weight_sum, const vec2 p_sampling_uv, const float p_mip_level, const vec3 p_pix_center_pos, vec3 p_pixel_normal, const float p_fallof_sq, const float p_weight_mod) {

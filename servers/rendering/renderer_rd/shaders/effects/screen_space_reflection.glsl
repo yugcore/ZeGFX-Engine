@@ -94,6 +94,10 @@ vec3 compute_geometric_normal(ivec2 pixel_pos, float depth_c, vec3 view_c, float
 
 #define M_PI 3.14159265359
 
+float quick_hash(vec2 p) {
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
 void main() {
 	ivec2 pixel_pos = ivec2(gl_GlobalInvocationID.xy);
 
@@ -120,9 +124,8 @@ void main() {
 		}
 		roughness /= (127.0 / 255.0);
 
-		// Do not compute SSR for rough materials to improve
-		// performance at the cost of subtle artifacting.
-		if (roughness >= 0.7) {
+		// Do not compute SSR for very rough materials to improve performance
+		if (roughness >= 0.85) {
 			imageStore(output_color, pixel_pos, vec4(0.0));
 			imageStore(output_mip_level, pixel_pos, vec4(0.0));
 			return;
@@ -135,7 +138,22 @@ void main() {
 		screen_pos = compute_screen_pos(pos);
 
 		vec3 view_dir = params.orthogonal ? vec3(0.0, 0.0, -1.0) : normalize(pos + scene_data.eye_offset[params.view_index].xyz);
-		vec3 ray_dir = normalize(reflect(view_dir, normal));
+
+		// ZeGFX GGX Microfacet Reflection Ray Perturbation
+		vec3 micro_normal = normal;
+		if (roughness > 0.01) {
+			float phi = quick_hash(vec2(pixel_pos) * 1.6180339) * 2.0 * M_PI;
+			float xi = quick_hash(vec2(pixel_pos.yx) * 2.7182818);
+			float a = roughness * roughness;
+			float cos_theta = sqrt(clamp((1.0 - xi) / max(1e-4, 1.0 + (a * a - 1.0) * xi), 0.0, 1.0));
+			float sin_theta = sqrt(clamp(1.0 - cos_theta * cos_theta, 0.0, 1.0));
+
+			vec3 tangent = normalize(abs(normal.z) < 0.999 ? cross(normal, vec3(0, 0, 1)) : cross(normal, vec3(1, 0, 0)));
+			vec3 bitangent = cross(normal, tangent);
+			micro_normal = normalize(sin_theta * cos(phi) * tangent + sin_theta * sin(phi) * bitangent + cos_theta * normal);
+		}
+
+		vec3 ray_dir = normalize(reflect(view_dir, micro_normal));
 
 		// Check if the ray is immediately intersecting with itself. If so, bounce!
 		if (dot(ray_dir, geom_normal) < 0.0) {
@@ -279,9 +297,10 @@ void main() {
 		// strong specular light can leak through the reflection.
 		if (fade > 0.999) {
 			fade = 1.0;
-		}
-
-		validity *= fade * margin_blend;
+		// ZeGFX Hermite Screen-Edge Feathering (Zero Hard Edge Pops)
+		vec2 screen_edge_dist = min(cur_screen_pos.xy, 1.0 - cur_screen_pos.xy);
+		float border_fade = smoothstep(0.0, 0.08, min(screen_edge_dist.x, screen_edge_dist.y));
+		validity *= fade * margin_blend * border_fade;
 
 		if (validity > 0.0) {
 			color = vec4(textureLod(source_last_frame, reprojected_pos.xy, 0).xyz, 1.0) * validity;

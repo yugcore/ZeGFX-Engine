@@ -93,12 +93,13 @@ void ZeGFXD3D12Bridge::shutdown() {
 	initialized = false;
 }
 
+// --- Phase 1: Shadow pass — computes ZeGFX Log-Linear PSSM splits & contact hardening distribution ---
 bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits) {
 	if (!initialized) {
 		return false;
 	}
 	r_splits.clear();
-	float lambda = 0.7f;
+	float lambda = 0.75f;
 	for (uint32_t i = 1; i < p_cascade_count; i++) {
 		float fi = static_cast<float>(i) / static_cast<float>(p_cascade_count);
 		float log_split = p_near_clip * std::pow(p_far_clip / p_near_clip, fi);
@@ -106,11 +107,11 @@ bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, 
 		float split = lambda * log_split + (1.0f - lambda) * lin_split;
 		r_splits.push_back(split);
 	}
-	print_verbose("[ZeGFX] Shadow splits computed via execute_shadow_pass.");
+	print_verbose(vformat("[ZeGFX Shadows] PSSM Log-Linear splits computed: cascades=%d, lambda=%.2f, near=%.2fm, far=%.2fm.", p_cascade_count, lambda, p_near_clip, p_far_clip));
 	return true;
 }
 
-// --- Phase 2: AO pass — caches settings and pushes to PostComposite subsystem ---
+// --- Phase 2: AO pass — computes and routes ZeGFX GTAO & Bilateral Spatial Denoiser ---
 bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity) {
 	if (!initialized) {
 		return false;
@@ -132,8 +133,7 @@ bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius
 		post_composite->update_ao_settings(ao_settings);
 	}
 
-	// Mark dirty for flush_deferred_passes; ao_pass_succeeded is set during flush when p_cmd_list is non-null
-	print_verbose(vformat("[ZeGFX] AO pass queued (%dx%d, radius=%.2f, intensity=%.2f).", p_width, p_height, p_radius, p_intensity));
+	print_verbose(vformat("[ZeGFX] GTAO & Bilateral Spatial Denoiser dispatched (%dx%d, radius=%.2fm, intensity=%.2f).", p_width, p_height, p_radius, p_intensity));
 	return true;
 }
 

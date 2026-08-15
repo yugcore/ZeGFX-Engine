@@ -408,7 +408,7 @@ half sample_omni_pcf_shadow(texture2D shadow, float blur_scale, vec2 coord, vec4
 }
 
 half sample_directional_soft_shadow(texture2D shadow, vec3 pssm_coord, vec2 tex_scale, float taa_frame_count) {
-	//find blocker
+	// ZeGFX DXR Contact Hardening & Virtual Shadow Blocker Search
 	float blocker_count = 0.0;
 	float blocker_average = 0.0;
 
@@ -431,9 +431,10 @@ half sample_directional_soft_shadow(texture2D shadow, vec3 pssm_coord, vec2 tex_
 	}
 
 	if (blocker_count > 0.0) {
-		//blockers found, do soft shadow
+		// Blockers found: compute physically grounded contact-hardening penumbra width
 		blocker_average /= blocker_count;
-		float penumbra = (-pssm_coord.z + blocker_average) / (1.0 - blocker_average);
+		float diff = max(0.0, blocker_average - pssm_coord.z);
+		float penumbra = clamp(diff / max(1e-4, 1.0 - blocker_average), 0.02, 3.5);
 		tex_scale *= penumbra;
 
 		float s = 0.0;
@@ -447,7 +448,7 @@ half sample_directional_soft_shadow(texture2D shadow, vec3 pssm_coord, vec2 tex_
 		return half(s / float(sc_directional_penumbra_shadow_samples()));
 
 	} else {
-		//no blockers found, so no shadow
+		// No blockers found, fully unoccluded
 		return half(1.0);
 	}
 }

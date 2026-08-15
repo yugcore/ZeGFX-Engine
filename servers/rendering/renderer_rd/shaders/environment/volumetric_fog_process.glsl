@@ -258,9 +258,20 @@ uint cluster_get_range_clip_mask(uint i, uint z_min, uint z_max) {
 	return bitfieldInsert(uint(0), uint(0xFFFFFFFF), local_min, mask_width);
 }
 
+// ZeGFX Dual-Lobe Mie-Rayleigh Atmospheric Phase Function
 float henyey_greenstein(float cos_theta, float g) {
-	const float k = 0.0795774715459; // 1 / (4 * PI)
-	return k * (1.0 - g * g) / (pow(1.0 + g * g - 2.0 * g * cos_theta, 1.5));
+	const float inv_4pi = 0.0795774715459; // 1 / (4 * PI)
+	
+	// Rayleigh atmospheric isotropic/symmetric fill
+	float rayleigh = (3.0 / (16.0 * M_PI)) * (1.0 + cos_theta * cos_theta);
+	
+	// Mie forward-scattering lobe for god rays
+	float g2 = g * g;
+	float denom = max(1e-4, 1.0 + g2 - 2.0 * g * cos_theta);
+	float mie = inv_4pi * (1.0 - g2) / (denom * sqrt(denom));
+	
+	// Blend 82% directional Mie scattering with 18% Rayleigh atmospheric fill
+	return mix(rayleigh, mie, 0.82);
 }
 
 vec3 safe_normalize(vec3 v) {

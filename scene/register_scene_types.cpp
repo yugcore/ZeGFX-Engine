@@ -261,6 +261,7 @@
 #include "scene/3d/occluder_instance_3d.h"
 #include "scene/3d/path_3d.h"
 #include "scene/3d/terrain_3d.h"
+#include "scene/3d/grass_3d.h"
 #include "scene/3d/world_partition_3d.h"
 #include "scene/3d/reflection_probe.h"
 #include "scene/3d/remote_transform_3d.h"
@@ -640,6 +641,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(AudioListener3D);
 	GDREGISTER_CLASS(MeshInstance3D);
 	GDREGISTER_CLASS(Terrain3D);
+	GDREGISTER_CLASS(Grass3D);
 	GDREGISTER_CLASS(WorldPartition3D);
 	GDREGISTER_CLASS(FloatingOrigin3D);
 #ifndef DISABLE_DEPRECATED

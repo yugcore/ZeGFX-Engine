@@ -1436,14 +1436,8 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 		float radius = environment_get_ssao_radius(p_environment);
 		float intensity = environment_get_ssao_intensity(p_environment);
 		ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity);
-
-		// ZeGFX GTAO replaces Godot's SSAO — skip Godot's own pass when ZeGFX AO succeeds.
-		if (ZeGFXD3D12Bridge::get_singleton()->ao_pass_active()) {
-			return;
-		}
 	}
 
-	// Fallback: Godot's built-in SSAO (runs only when ZeGFX AO is not active)
 	RendererRD::SSEffects::SSAOSettings settings;
 	settings.radius = environment_get_ssao_radius(p_environment);
 	settings.intensity = environment_get_ssao_intensity(p_environment);
