@@ -297,6 +297,7 @@ void main() {
 		// strong specular light can leak through the reflection.
 		if (fade > 0.999) {
 			fade = 1.0;
+		}
 		// ZeGFX Hermite Screen-Edge Feathering (Zero Hard Edge Pops)
 		vec2 screen_edge_dist = min(cur_screen_pos.xy, 1.0 - cur_screen_pos.xy);
 		float border_fade = smoothstep(0.0, 0.08, min(screen_edge_dist.x, screen_edge_dist.y));

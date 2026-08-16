@@ -41,6 +41,7 @@
 #include "core/io/resource_saver.h"
 #include "core/object/class_db.h"
 #include "core/object/script_language.h"
+#include "editor/file_system/editor_file_system.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/import/3d/scene_import_settings.h"
@@ -3326,6 +3327,28 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 		zegfx::cooker::CookResult cook_res = cooker.CookMesh(global_src.utf8().get_data(), global_out.utf8().get_data());
 		if (cook_res.success) {
 			print_verbose(vformat("ZeGFX AssetCooker successfully baked '%s' -> '%s' (.zmesh V2)", src_path, cooked_output_path));
+
+			// Generate companion .tscn so the cooked asset can be opened and edited directly in the 3D viewport
+			String tscn_path = content_dir + "/" + base_name + ".tscn";
+			Ref<PackedScene> packed_scene;
+			packed_scene.instantiate();
+			Node3D *root_node = memnew(Node3D);
+			root_node->set_name(base_name);
+			MeshInstance3D *mesh_instance = memnew(MeshInstance3D);
+			mesh_instance->set_name(base_name + "_Mesh");
+			Ref<ArrayMesh> zmesh = ResourceLoader::load(cooked_output_path);
+			if (zmesh.is_valid()) {
+				mesh_instance->set_mesh(zmesh);
+			}
+			root_node->add_child(mesh_instance);
+			mesh_instance->set_owner(root_node);
+			packed_scene->pack(root_node);
+			ResourceSaver::save(packed_scene, tscn_path);
+			memdelete(root_node);
+
+			if (EditorFileSystem::get_singleton()) {
+				callable_mp(EditorFileSystem::get_singleton(), &EditorFileSystem::scan_changes).call_deferred();
+			}
 
 			// Register the cooked asset with the bridge for runtime meshlet streaming.
 			if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {

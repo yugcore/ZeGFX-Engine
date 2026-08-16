@@ -227,12 +227,12 @@ bool ZeGFXD3D12Bridge::cook_and_load_zmesh(const String &p_source_file, const St
 
 	auto result = cooker.CookMesh(src, dst);
 	if (!result) {
-		print_line(vformat("[ZeGFX] cook_and_load_zmesh FAILED: %s -> %s (%s)",
+		print_line(vformat("[ZeGFX] AssetCooker FAILED: %s -> %s (%s)",
 				p_source_file, p_output_zmesh, String(result.errorMessage.c_str())));
 		return false;
 	}
 
-	print_verbose(vformat("[ZeGFX] Cook & load .zmesh succeeded: '%s' -> '%s'.", p_source_file, p_output_zmesh));
+	print_line(vformat("[ZeGFX Meshlet Pipeline] Successfully baked '%s' -> '%s' (.zmesh V2 with GPU Meshlets & Multi-LOD).", p_source_file, p_output_zmesh));
 	return true;
 }
 

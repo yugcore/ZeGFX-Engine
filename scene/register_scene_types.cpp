@@ -390,8 +390,14 @@ static Ref<ResourceFormatLoaderCompressedTexture3D> resource_loader_texture_3d;
 static Ref<ResourceFormatSaverShader> resource_saver_shader;
 static Ref<ResourceFormatLoaderShader> resource_loader_shader;
 
+#include "drivers/d3d12/resource_format_loader_zmesh.h"
+
 static Ref<ResourceFormatSaverShaderInclude> resource_saver_shader_include;
 static Ref<ResourceFormatLoaderShaderInclude> resource_loader_shader_include;
+
+static Ref<ResourceFormatLoaderZMesh> resource_loader_zmesh;
+static Ref<ResourceFormatLoaderZMat> resource_loader_zmat;
+static Ref<ResourceFormatLoaderZTex> resource_loader_ztex;
 
 void register_scene_types() {
 	OS::get_singleton()->benchmark_begin_measure("Scene", "Register Types");
@@ -438,6 +444,16 @@ void register_scene_types() {
 		resource_loader_shader_include.instantiate();
 		ResourceLoader::add_resource_format_loader(resource_loader_shader_include, true);
 	}
+
+	// ZeGFX .zmesh, .zmat, and .ztex binary format loaders
+	resource_loader_zmesh.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_zmesh);
+
+	resource_loader_zmat.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_zmat);
+
+	resource_loader_ztex.instantiate();
+	ResourceLoader::add_resource_format_loader(resource_loader_ztex);
 
 	OS::get_singleton()->yield(); // may take time to init
 
@@ -1363,6 +1379,15 @@ void unregister_scene_types() {
 
 		ResourceLoader::remove_resource_format_loader(resource_loader_shader_include);
 		resource_loader_shader_include.unref();
+	}
+
+	if (resource_loader_zmesh.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_zmesh);
+		resource_loader_zmesh.unref();
+	}
+	if (resource_loader_zmat.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_zmat);
+		resource_loader_zmat.unref();
 	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either
