@@ -2240,18 +2240,17 @@ void fragment_shader(in SceneData scene_data) {
 	f0 = mix(f0, f0_Clear_Coat_To_Surface(f0), clearcoat);
 #endif
 
+	// Global Multiscattering Energy Compensation (Evaluated for all direct & indirect specular passes)
+	float NdotV = clamp(dot(normal, view), 0.0001, 1.0);
+	vec2 envBRDF = prefiltered_dfg(roughness, NdotV);
+	energy_compensation = get_energy_compensation(f0, envBRDF.y);
+
 #ifndef AMBIENT_LIGHT_DISABLED
 	{
 #if defined(DIFFUSE_TOON)
 		//simplify for toon, as
 		indirect_specular_light *= specular * metallic * albedo * 2.0;
 #else
-		// Base Layer
-		float NdotV = clamp(dot(normal, view), 0.0001, 1.0);
-		vec2 envBRDF = prefiltered_dfg(roughness, NdotV);
-		// Multiscattering
-		energy_compensation = get_energy_compensation(f0, envBRDF.y);
-
 		// cheap luminance approximation
 		float f90 = clamp(50.0 * f0.g, metallic, 1.0);
 		indirect_specular_light *= energy_compensation * ((f90 - f0) * envBRDF.x + f0 * envBRDF.y);
@@ -2520,6 +2519,7 @@ void fragment_shader(in SceneData scene_data) {
 							float shadow2 = sample_directional_pcf_shadow(directional_shadow_atlas, scene_data.directional_shadow_pixel_size * directional_lights.data[i].soft_shadow_scale * (blur_factor2 + (1.0 - blur_factor2) * float(directional_lights.data[i].blend_splits)), pssm_coord, scene_data.taa_frame_count);
 							shadow = mix(shadow, shadow2, pssm_blend);
 						}
+
 					}
 
 #ifdef USE_LIGHTMAP
@@ -2533,6 +2533,12 @@ void fragment_shader(in SceneData scene_data) {
 #ifdef USE_LIGHTMAP
 					}
 #endif
+
+					// Screen-Space Contact Shadows (SSCS) for fine contact hardening
+					if (shadow > 0.001) {
+						half contact_shadow = calculate_screen_space_contact_shadow(vertex, -directional_lights.data[i].direction, 0.35, scene_data.taa_frame_count);
+						shadow *= float(contact_shadow);
+					}
 
 #ifdef USE_VERTEX_LIGHTING
 					diffuse_light *= mix(1.0, shadow, diffuse_light_interp.a);

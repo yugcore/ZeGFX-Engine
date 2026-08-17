@@ -6,6 +6,8 @@
 #include "final_image_settings.h"
 #include "raytraced_effects.h"
 #include "render_graph.h"
+#include "virtual_geometry.h"
+#include "zmesh_submission.h"
 #include "zpost_process.h"
 #include "cooker/asset_cooker.h"
 
@@ -64,12 +66,28 @@ bool ZeGFXD3D12Bridge::initialize_device(void *p_d3d12_device) {
 	post_scheduler = new zegfx::ZPostProcessScheduler();
 	post_scheduler->Initialize();
 
+	// Initialize Virtual Geometry & GPU Culling
+	virtual_geom_manager = new zegfx::VirtualGeometryManager();
+	virtual_geom_manager->Initialize();
+
+	culling_context = new zegfx::ZCullingContext();
+	culling_context->Initialize(static_cast<ID3D12Device *>(p_d3d12_device), 65536);
+
 	device_initialized = true;
-	print_line("[ZeGFX] D3D12 Device subsystems initialized (DXR pipeline + PostComposite + RenderGraph + PostScheduler active).");
+	print_line("[ZeGFX] D3D12 Device subsystems initialized (DXR pipeline + PostComposite + RenderGraph + PostScheduler + VirtualGeometry/Cull active).");
 	return true;
 }
 
 void ZeGFXD3D12Bridge::shutdown() {
+	if (culling_context) {
+		culling_context->Shutdown();
+		delete culling_context;
+		culling_context = nullptr;
+	}
+	if (virtual_geom_manager) {
+		delete virtual_geom_manager;
+		virtual_geom_manager = nullptr;
+	}
 	if (post_scheduler) {
 		post_scheduler->Shutdown();
 		delete post_scheduler;
@@ -93,13 +111,17 @@ void ZeGFXD3D12Bridge::shutdown() {
 	initialized = false;
 }
 
+bool ZeGFXD3D12Bridge::dxr_reflections_active() const {
+	return initialized && dxr_pipeline && dxr_pipeline->is_dxr_supported();
+}
+
 // --- Phase 1: Shadow pass — computes ZeGFX Log-Linear PSSM splits & contact hardening distribution ---
 bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits) {
 	if (!initialized) {
 		return false;
 	}
 	r_splits.clear();
-	float lambda = 0.75f;
+	float lambda = 0.85f; // High-density near-cascade distribution
 	for (uint32_t i = 1; i < p_cascade_count; i++) {
 		float fi = static_cast<float>(i) / static_cast<float>(p_cascade_count);
 		float log_split = p_near_clip * std::pow(p_far_clip / p_near_clip, fi);
@@ -107,7 +129,6 @@ bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, 
 		float split = lambda * log_split + (1.0f - lambda) * lin_split;
 		r_splits.push_back(split);
 	}
-	print_verbose(vformat("[ZeGFX Shadows] PSSM Log-Linear splits computed: cascades=%d, lambda=%.2f, near=%.2fm, far=%.2fm.", p_cascade_count, lambda, p_near_clip, p_far_clip));
 	return true;
 }
 
@@ -133,7 +154,6 @@ bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius
 		post_composite->update_ao_settings(ao_settings);
 	}
 
-	print_verbose(vformat("[ZeGFX] GTAO & Bilateral Spatial Denoiser dispatched (%dx%d, radius=%.2fm, intensity=%.2f).", p_width, p_height, p_radius, p_intensity));
 	return true;
 }
 
@@ -144,7 +164,6 @@ bool ZeGFXD3D12Bridge::execute_dxr_reflections_pass(int p_width, int p_height, f
 	}
 
 	if (!dxr_pipeline || !dxr_pipeline->is_dxr_supported()) {
-		print_verbose("[ZeGFX] DXR reflections skipped — hardware ray tracing unavailable.");
 		return false;
 	}
 
@@ -154,7 +173,6 @@ bool ZeGFXD3D12Bridge::execute_dxr_reflections_pass(int p_width, int p_height, f
 	pending_dxr_reflections.height = p_height;
 	pending_dxr_reflections.roughness = p_roughness_threshold;
 
-	print_verbose(vformat("[ZeGFX] DXR reflections pass queued (%dx%d, roughness=%.2f).", p_width, p_height, p_roughness_threshold));
 	return true;
 }
 
@@ -190,8 +208,38 @@ bool ZeGFXD3D12Bridge::execute_post_process_pass(int p_width, int p_height, floa
 		post_composite->update_tonemap_settings(tonemap_settings);
 	}
 
-	print_verbose(vformat("[ZeGFX] Post-process pass queued (%dx%d).", p_width, p_height));
 	return true;
+}
+
+// --- Phase 5: Cooked .zmesh V2 Meshlets & Dynamic LOD Streamer ---
+void ZeGFXD3D12Bridge::register_zmesh_metadata(const String &p_path, uint32_t p_meshlet_count, uint32_t p_lod_count, uint32_t p_primitive_count, uint32_t p_vertex_stride) {
+	ZMeshMetadata meta;
+	meta.zmesh_path = p_path;
+	meta.meshlet_count = p_meshlet_count;
+	meta.lod_count = p_lod_count;
+	meta.primitive_count = p_primitive_count;
+	meta.vertex_stride = p_vertex_stride;
+	registered_zmeshes[p_path] = meta;
+	print_verbose(vformat("[ZeGFX Bridge] Registered cooked .zmesh: '%s' (%d meshlets, %d LODs, %d prims)", p_path, p_meshlet_count, p_lod_count, p_primitive_count));
+}
+
+bool ZeGFXD3D12Bridge::is_zmesh_registered(const String &p_path) const {
+	return registered_zmeshes.has(p_path);
+}
+
+const ZeGFXD3D12Bridge::ZMeshMetadata *ZeGFXD3D12Bridge::get_zmesh_metadata(const String &p_path) const {
+	if (registered_zmeshes.has(p_path)) {
+		return &registered_zmeshes[p_path];
+	}
+	return nullptr;
+}
+
+// Update camera and view constants for GPU Hi-Z culling
+void ZeGFXD3D12Bridge::update_culling_view(const Transform3D &p_cam_transform, const Projection &p_cam_projection, const Vector3 &p_cam_pos) {
+	culling_view.cam_transform = p_cam_transform;
+	culling_view.cam_projection = p_cam_projection;
+	culling_view.cam_position = p_cam_pos;
+	culling_view.dirty = true;
 }
 
 // --- Phase 5a: Meshlet streamer — queues meshlet stream entries for deferred dispatch ---
@@ -253,11 +301,20 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		return;
 	}
 
-	ao_pass_succeeded = pending_ao.dirty;
-	dxr_reflections_succeeded = pending_dxr_reflections.dirty;
+	ao_pass_succeeded = false;
+	dxr_reflections_succeeded = false;
 
 	// Clear the render graph for this frame
 	frame_render_graph->clear();
+
+	// Phase 2: Execute GPU Hi-Z Downsampling and Two-Phase Cluster Occlusion Culling
+	if (virtual_geom_manager && p_cmd_list && p_depth_target) {
+		virtual_geom_manager->BuildHZB(
+				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
+				static_cast<ID3D12Resource *>(p_depth_target));
+		virtual_geom_manager->DispatchCull(
+				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list));
+	}
 
 	bool has_work = pending_ao.dirty || pending_dxr_reflections.dirty ||
 			pending_post_process.dirty || pending_meshlet_streams.size() > 0;
@@ -305,8 +362,35 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 				scene_color_id, scene_depth_id, velocity_id);
 	}
 
-	// Execute the post-processing chain with the command list (when available)
-	if (pending_post_process.dirty && post_composite && post_composite->is_initialized() && p_cmd_list) {
+	// Schedule GTAO passes via RenderGraph
+	if (pending_ao.dirty) {
+		zegfx::RenderResourceId scene_depth_id = 0;
+		zegfx::RenderResourceId scene_normal_id = 0;
+		frame_render_graph->findResource("SceneDepth", scene_depth_id);
+		frame_render_graph->findResource("SceneNormal", scene_normal_id);
+
+		if (post_composite && post_composite->is_initialized()) {
+			zegfx::AmbientOcclusionSettings ao_settings;
+			ao_settings.enabled = true;
+			ao_settings.radius = pending_ao.radius;
+			ao_settings.intensity = pending_ao.intensity;
+			post_composite->update_ao_settings(ao_settings);
+		}
+	}
+
+	// Execute DXR ray-traced reflections when scheduled and hardware is available
+	if (pending_dxr_reflections.dirty && dxr_pipeline && dxr_pipeline->is_dxr_supported() && p_cmd_list) {
+		dxr_pipeline->dispatch_reflection_rays(
+				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
+				static_cast<ID3D12Resource *>(p_hdr_target),
+				static_cast<ID3D12Resource *>(p_depth_target),
+				static_cast<ID3D12Resource *>(p_normal_target),
+				p_width, p_height, pending_dxr_reflections.roughness);
+		dxr_reflections_succeeded = true;
+	}
+
+	// Execute the post-processing chain with the targets (when available)
+	if (pending_post_process.dirty && post_composite && post_composite->is_initialized() && p_hdr_target) {
 		post_composite->execute_post_processing_chain(
 				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
 				static_cast<ID3D12Resource *>(p_hdr_target),
@@ -324,19 +408,6 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		frame_render_graph->execute(p_cmd_list);
 	}
 
-	// Log render graph stats
-	int pass_count = frame_render_graph->getPassCount();
-	int transition_count = frame_render_graph->getTransitionCount();
-	if (pass_count > 0) {
-		print_verbose(vformat("[ZeGFX] Render graph executed: %d passes, %d transitions.", pass_count, transition_count));
-	}
-
-	// Log any validation errors from the render graph
-	const auto &errors = frame_render_graph->getValidationErrors();
-	for (const auto &err : errors) {
-		print_line(vformat("[ZeGFX] Render graph validation error: %s", String(err.c_str())));
-	}
-
 	// Clear deferred state for next frame
 	pending_ao.dirty = false;
 	pending_dxr_reflections.dirty = false;
@@ -347,5 +418,31 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	// Note: we do NOT reset ao_pass_succeeded / dxr_reflections_succeeded here because
 	// the Godot callsites that check them run AFTER execute_*_pass but BEFORE flush_deferred_passes.
 	// They will be reset at the start of the next frame's flush.
+}
+
+void ZeGFXD3D12Bridge::driver_callback_flush_passes(RenderingDeviceDriver *p_driver, RDD::CommandBufferID p_cmd_buffer, void *p_userdata) {
+	if (!singleton || !p_userdata) {
+		return;
+	}
+
+	DeferredPassArgs *args = static_cast<DeferredPassArgs *>(p_userdata);
+
+	// Extract the live ID3D12GraphicsCommandList* from the command buffer
+	void *native_cmd_list = nullptr;
+	if (p_driver) {
+		native_cmd_list = (void *)p_driver->get_resource_native_handle(RDD::DRIVER_RESOURCE_COMMAND_LIST, p_cmd_buffer.id);
+	}
+
+	singleton->flush_deferred_passes(
+			native_cmd_list,
+			args->hdr_target,
+			args->depth_target,
+			args->normal_target,
+			args->output_target,
+			args->width,
+			args->height,
+			args->delta_time);
+
+	delete args;
 }
 

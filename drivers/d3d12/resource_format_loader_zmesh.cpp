@@ -7,6 +7,7 @@
 #include "core/config/project_settings.h"
 #include "core/io/file_access.h"
 #include "core/io/dir_access.h"
+#include "zegfx_d3d12_bridge.h"
 
 #include "ZeGFX/include/cooked_asset_serialization.h"
 
@@ -283,6 +284,10 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 	mesh->set_meta("zegfx_meshlet_count", (int64_t)meta->MeshletCount);
 	mesh->set_meta("zegfx_lod_count", (int64_t)lod_count);
 	mesh->set_meta("zegfx_primitive_count", (int64_t)prim_count);
+
+	if (ZeGFXD3D12Bridge::get_singleton()) {
+		ZeGFXD3D12Bridge::get_singleton()->register_zmesh_metadata(p_path, meta->MeshletCount, lod_count, prim_count, meta->VertexStride);
+	}
 
 	print_line(vformat("[ZeGFX] Loaded .zmesh: '%s' (%d primitives, %d meshlets, %d LODs)", p_path, prim_count, meta->MeshletCount, lod_count));
 

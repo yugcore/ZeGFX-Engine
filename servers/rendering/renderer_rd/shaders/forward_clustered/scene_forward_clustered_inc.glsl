@@ -500,7 +500,7 @@ vec2 prefiltered_dfg(float lod, float NoV) {
 // Compute multiscatter compensation
 // https://google.github.io/filament/Filament.html#listing_energycompensationimpl
 vec3 get_energy_compensation(vec3 f0, float env) {
-	return 1.0 + f0 * (1.0 / env - 1.0);
+	return 1.0 + f0 * (1.0 / max(1e-4, env) - 1.0);
 }
 
 /* Set 2 Skeleton & Instancing (can change per item) */

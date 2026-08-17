@@ -1502,8 +1502,8 @@ void RenderForwardClustered::_process_ssr(Ref<RenderSceneBuffersRD> p_render_buf
 		Size2i size = p_render_buffers->get_internal_size();
 		ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, 0.5f);
 
-		// ZeGFX DXR reflections replace Godot's SSR when DXR hardware is available.
-		if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active()) {
+		// ZeGFX DXR reflections replace Godot's SSR when DXR ray dispatch has successfully executed
+		if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active() && ZeGFXD3D12Bridge::get_singleton()->has_dxr_reflections_succeeded()) {
 			return;
 		}
 	}
@@ -2246,12 +2246,40 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 		RD::get_singleton()->draw_command_end_label();
 
-		// ZeGFX Meshlet Streamer — runs in PARALLEL with Godot's standard draw path.
-		// Queues GPU-driven indirect draws for any .zmesh cooked assets in the scene.
+		// ZeGFX Meshlet Streamer & GPU Hi-Z Culling — runs in PARALLEL with Godot's standard draw path.
+		// Queues GPU-driven indirect draws and updates view constants for any .zmesh cooked assets in the scene.
 		if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
-			// TODO: Iterate actual .zmesh instances from the scene graph.
-			// For now, the meshlet streamer pass is queued but only processes entries
-			// that have been explicitly submitted via execute_meshlet_streamer_pass().
+			if (p_render_data && p_render_data->scene_data) {
+				ZeGFXD3D12Bridge::get_singleton()->update_culling_view(
+						p_render_data->scene_data->cam_transform,
+						p_render_data->scene_data->cam_projection,
+						p_render_data->scene_data->cam_transform.origin);
+			}
+
+			if (RendererRD::MeshStorage::get_singleton()) {
+				const int element_count = render_list[RENDER_LIST_OPAQUE].elements.size();
+				const GeometryInstanceSurfaceDataCache *const *elements = render_list[RENDER_LIST_OPAQUE].elements.ptr();
+				const RenderElementInfo *elem_info = render_list[RENDER_LIST_OPAQUE].element_info.ptr();
+
+				for (int i = 0; i < element_count; ++i) {
+					const GeometryInstanceSurfaceDataCache *surf = elements[i];
+					if (!surf || !surf->owner || !surf->owner->data) {
+						continue;
+					}
+
+					RID base_mesh = surf->owner->data->base;
+					if (!base_mesh.is_valid() || !RendererRD::MeshStorage::get_singleton()->owns_mesh(base_mesh)) {
+						continue;
+					}
+
+					String mesh_path = RendererRD::MeshStorage::get_singleton()->mesh_get_path(base_mesh);
+					if (!mesh_path.is_empty() && (mesh_path.ends_with(".zmesh") || ZeGFXD3D12Bridge::get_singleton()->is_zmesh_registered(mesh_path))) {
+						uint32_t lod = elem_info ? elem_info[i].lod_index : 0;
+						uint32_t instances = (surf->owner->instance_count > 1) ? surf->owner->instance_count : 1;
+						ZeGFXD3D12Bridge::get_singleton()->execute_meshlet_streamer_pass(mesh_path, lod, instances);
+					}
+				}
+			}
 		}
 
 		if (using_motion_pass) {

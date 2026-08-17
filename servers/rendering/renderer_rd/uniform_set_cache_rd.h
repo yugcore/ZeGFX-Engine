@@ -115,6 +115,9 @@ class UniformSetCacheRD : public Object {
 
 	template <typename Collection>
 	RID _allocate_from_uniforms(RID p_shader, uint32_t p_set, uint32_t p_hash, uint32_t p_table_idx, const Collection &p_uniforms) {
+		if (p_shader.is_null()) {
+			return RID();
+		}
 		RID rid = RD::get_singleton()->uniform_set_create(p_uniforms, p_shader, p_set);
 		ERR_FAIL_COND_V(rid.is_null(), rid);
 
@@ -147,6 +150,9 @@ private:
 public:
 	template <typename... Args>
 	RID get_cache(RID p_shader, uint32_t p_set, Args... args) {
+		if (p_shader.is_null()) {
+			return RID();
+		}
 		uint32_t h = hash_murmur3_one_64(p_shader.get_id());
 		h = hash_murmur3_one_32(p_set, h);
 		h = _hash_args(h, args...);
@@ -170,6 +176,9 @@ public:
 
 	template <typename... Args>
 	RID get_cache_vec(RID p_shader, uint32_t p_set, const LocalVector<RD::Uniform> &p_uniforms) {
+		if (p_shader.is_null()) {
+			return RID();
+		}
 		uint32_t h = hash_murmur3_one_64(p_shader.get_id());
 		h = hash_murmur3_one_32(p_set, h);
 		for (uint32_t i = 0; i < p_uniforms.size(); i++) {

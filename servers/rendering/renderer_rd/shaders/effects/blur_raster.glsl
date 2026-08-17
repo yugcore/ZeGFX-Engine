@@ -70,66 +70,83 @@ layout(location = 0) out vec4 frag_color;
 
 #ifdef MODE_GLOW_DOWNSAMPLE
 
-// https://www.shadertoy.com/view/mdsyDf
-vec4 BloomDownKernel4(sampler2D Tex, vec2 uv0) {
+float luma(vec3 color) {
+	return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+float karis_weight(vec3 color) {
+	return 1.0 / (1.0 + luma(color));
+}
+
+// 13-Tap Dual-Filter Downsampling (Karis average with sub-pixel firefly suppression)
+vec4 BloomDownKernel13(sampler2D Tex, vec2 uv0) {
 	vec2 RcpSrcTexRes = blur.source_pixel_size;
+	vec2 uv = (uv0 * 2.0 + 1.0) * RcpSrcTexRes;
 
-	vec2 tc = (uv0 * 2.0 + 1.0) * RcpSrcTexRes;
+	// 13-tap layout: 4 corners, 4 cardinals, 4 inner diagonals, 1 center
+	vec4 A = textureLod(Tex, uv + vec2(-2.0, -2.0) * RcpSrcTexRes, 0.0);
+	vec4 B = textureLod(Tex, uv + vec2( 0.0, -2.0) * RcpSrcTexRes, 0.0);
+	vec4 C = textureLod(Tex, uv + vec2( 2.0, -2.0) * RcpSrcTexRes, 0.0);
 
-	float la = 1.0 / 4.0;
+	vec4 D = textureLod(Tex, uv + vec2(-1.0, -1.0) * RcpSrcTexRes, 0.0);
+	vec4 E = textureLod(Tex, uv + vec2( 1.0, -1.0) * RcpSrcTexRes, 0.0);
 
-	vec2 o = (0.5 + la) * RcpSrcTexRes;
+	vec4 F = textureLod(Tex, uv + vec2(-2.0,  0.0) * RcpSrcTexRes, 0.0);
+	vec4 G = textureLod(Tex, uv, 0.0);
+	vec4 H = textureLod(Tex, uv + vec2( 2.0,  0.0) * RcpSrcTexRes, 0.0);
 
-	vec4 c = vec4(0.0);
-	c += textureLod(Tex, tc + vec2(-1.0, -1.0) * o, 0.0) * 0.25;
-	c += textureLod(Tex, tc + vec2(1.0, -1.0) * o, 0.0) * 0.25;
-	c += textureLod(Tex, tc + vec2(-1.0, 1.0) * o, 0.0) * 0.25;
-	c += textureLod(Tex, tc + vec2(1.0, 1.0) * o, 0.0) * 0.25;
+	vec4 I = textureLod(Tex, uv + vec2(-1.0,  1.0) * RcpSrcTexRes, 0.0);
+	vec4 J = textureLod(Tex, uv + vec2( 1.0,  1.0) * RcpSrcTexRes, 0.0);
 
-	return c;
+	vec4 K = textureLod(Tex, uv + vec2(-2.0,  2.0) * RcpSrcTexRes, 0.0);
+	vec4 L = textureLod(Tex, uv + vec2( 0.0,  2.0) * RcpSrcTexRes, 0.0);
+	vec4 M = textureLod(Tex, uv + vec2( 2.0,  2.0) * RcpSrcTexRes, 0.0);
+
+	// 5 overlapping 2x2 bilinear groups with Karis weighting
+	vec4 quad1 = (A + B + F + G) * 0.25;
+	vec4 quad2 = (B + C + G + H) * 0.25;
+	vec4 quad3 = (F + G + K + L) * 0.25;
+	vec4 quad4 = (G + H + L + M) * 0.25;
+	vec4 quad5 = (D + E + I + J) * 0.25;
+
+	float w1 = karis_weight(quad1.rgb) * 0.125;
+	float w2 = karis_weight(quad2.rgb) * 0.125;
+	float w3 = karis_weight(quad3.rgb) * 0.125;
+	float w4 = karis_weight(quad4.rgb) * 0.125;
+	float w5 = karis_weight(quad5.rgb) * 0.5;
+
+	float total_weight = w1 + w2 + w3 + w4 + w5;
+	return (quad1 * w1 + quad2 * w2 + quad3 * w3 + quad4 * w4 + quad5 * w5) / max(1e-5, total_weight);
 }
 
 #endif
 
 #ifdef MODE_GLOW_UPSAMPLE
 
-// https://www.shadertoy.com/view/mdsyDf
-vec4 BloomUpKernel4(sampler2D Tex, vec2 uv0) {
+// 9-Tap 3x3 Tent Upsampling Filter (Smooth continuous energy dispersion)
+vec4 BloomUpKernel9(sampler2D Tex, vec2 uv0) {
 	vec2 RcpSrcTexRes = blur.source_pixel_size;
+	vec2 uv = (uv0 * 0.5 + 0.5) * blur.dest_pixel_size;
 
-	vec2 uv = uv0 * 0.5 + 0.5;
+	vec2 d = RcpSrcTexRes * 1.0;
 
-	vec2 uvI = floor(uv);
-	vec2 uvF = uv - uvI;
+	vec4 c = vec4(0.0);
+	// 4 corner samples (weight 1/16)
+	c += textureLod(Tex, uv + vec2(-d.x, -d.y), 0.0) * (1.0 / 16.0);
+	c += textureLod(Tex, uv + vec2( d.x, -d.y), 0.0) * (1.0 / 16.0);
+	c += textureLod(Tex, uv + vec2(-d.x,  d.y), 0.0) * (1.0 / 16.0);
+	c += textureLod(Tex, uv + vec2( d.x,  d.y), 0.0) * (1.0 / 16.0);
 
-	vec2 tc = uvI * RcpSrcTexRes.xy;
+	// 4 cardinal samples (weight 2/16)
+	c += textureLod(Tex, uv + vec2(  0.0, -d.y), 0.0) * (2.0 / 16.0);
+	c += textureLod(Tex, uv + vec2(-d.x,   0.0), 0.0) * (2.0 / 16.0);
+	c += textureLod(Tex, uv + vec2( d.x,   0.0), 0.0) * (2.0 / 16.0);
+	c += textureLod(Tex, uv + vec2(  0.0,  d.y), 0.0) * (2.0 / 16.0);
 
-	// optimal stop-band
-	float lw = 0.357386;
-	float la = 25.0 / 32.0; // 0.78125  ~ 0.779627;
-	float lb = 3.0 / 64.0; // 0.046875 ~ 0.0493871;
+	// Center sample (weight 4/16)
+	c += textureLod(Tex, uv, 0.0) * (4.0 / 16.0);
 
-	vec2 l = vec2(-1.5 + la, 0.5 + lb);
-
-	vec2 lx = uvF.x == 0.0 ? l.xy : -l.yx;
-	vec2 ly = uvF.y == 0.0 ? l.xy : -l.yx;
-
-	lx *= RcpSrcTexRes.xx;
-	ly *= RcpSrcTexRes.yy;
-
-	vec4 c00 = textureLod(Tex, tc + vec2(lx.x, ly.x), 0.0);
-	vec4 c10 = textureLod(Tex, tc + vec2(lx.y, ly.x), 0.0);
-	vec4 c01 = textureLod(Tex, tc + vec2(lx.x, ly.y), 0.0);
-	vec4 c11 = textureLod(Tex, tc + vec2(lx.y, ly.y), 0.0);
-
-	vec2 w = abs(uvF * 2.0 - lw);
-
-	vec4 cx0 = c00 * (1.0 - w.x) + (c10 * w.x);
-	vec4 cx1 = c01 * (1.0 - w.x) + (c11 * w.x);
-
-	vec4 cxy = cx0 * (1.0 - w.y) + (cx1 * w.y);
-
-	return cxy;
+	return c;
 }
 
 #endif // MODE_GLOW_UPSAMPLE
@@ -209,14 +226,14 @@ void main() {
 #endif // MODE_GLOW_GATHER_WIDE
 
 #ifdef MODE_GLOW_DOWNSAMPLE
-	// Regular downsample, apply a simple blur.
-	frag_color = BloomDownKernel4(source_color, floor(gl_FragCoord.xy));
+	// 13-tap Karis dual-filter downsample with firefly suppression
+	frag_color = BloomDownKernel13(source_color, floor(gl_FragCoord.xy));
 	frag_color *= blur.glow_strength;
 #endif // MODE_GLOW_DOWNSAMPLE
 
 #ifdef MODE_GLOW_UPSAMPLE
-
-	frag_color = BloomUpKernel4(source_color, floor(gl_FragCoord.xy)) * blur.glow_strength; // "glow_strength" here is actually the glow level. It is always 1.0, except for the first upsample where we need to apply the level to two textures at once.
+	// 9-tap 3x3 tent upsample for smooth optical dispersion
+	frag_color = BloomUpKernel9(source_color, floor(gl_FragCoord.xy)) * blur.glow_strength; // "glow_strength" here is actually the glow level. It is always 1.0, except for the first upsample where we need to apply the level to two textures at once.
 	if (use_blend_color) {
 		vec2 uv = floor(gl_FragCoord.xy) + 0.5;
 		frag_color += textureLod(blend_color, uv * blur.dest_pixel_size, 0.0) * blur.glow_level;

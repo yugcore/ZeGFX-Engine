@@ -44,7 +44,9 @@ void main() {
 	if (any(lessThan(pos, params.source_size))) {
 #ifdef READ_TEXTURE
 		vec3 v = texelFetch(source_texture, pos, 0).rgb;
-		tmp_data[t] = max(v.r, max(v.g, v.b));
+		// Rec.709 perceived photometric luminance in log2 domain
+		float lum = max(dot(v, vec3(0.2126, 0.7152, 0.0722)), 1e-4);
+		tmp_data[t] = log2(lum);
 #else
 		tmp_data[t] = imageLoad(source_luminance, pos).r;
 #endif
@@ -70,12 +72,15 @@ void main() {
 	if (t == 0) {
 		//compute rect size
 		ivec2 rect_size = min(params.source_size - pos, ivec2(BLOCK_SIZE));
-		float avg = tmp_data[0] / float(rect_size.x * rect_size.y);
-		//float avg = tmp_data[0] / float(BLOCK_SIZE*BLOCK_SIZE);
+		float log_avg = tmp_data[0] / float(rect_size.x * rect_size.y);
 		pos /= ivec2(BLOCK_SIZE);
 #ifdef WRITE_LUMINANCE
+		// Reconstruct true geometric mean luminance from log2 space
+		float avg = exp2(log_avg);
 		float prev_lum = texelFetch(prev_luminance, ivec2(0, 0), 0).r; //1 pixel previous exposure
 		avg = clamp(prev_lum + (avg - prev_lum) * params.exposure_adjust, params.min_luminance, params.max_luminance);
+#else
+		float avg = log_avg;
 #endif
 		imageStore(dest_luminance, pos, vec4(avg));
 	}

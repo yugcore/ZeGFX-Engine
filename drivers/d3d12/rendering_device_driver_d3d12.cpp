@@ -5782,6 +5782,13 @@ uint64_t RenderingDeviceDriverD3D12::get_resource_native_handle(DriverResource p
 		case DRIVER_RESOURCE_RENDER_PIPELINE: {
 			return p_driver_id.id;
 		}
+		case DRIVER_RESOURCE_COMMAND_LIST: {
+			const CommandBufferInfo *cmd_buf_info = (const CommandBufferInfo *)p_driver_id.id;
+			if (cmd_buf_info && cmd_buf_info->cmd_list) {
+				return (uint64_t)cmd_buf_info->cmd_list.Get();
+			}
+			return 0;
+		}
 		default: {
 			return 0;
 		}

@@ -470,6 +470,12 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 	can_use_effects &= _debug_draw_can_use_effects(debug_draw);
 	bool can_use_storage = _render_buffers_can_be_storage();
 
+	RSE::ViewportScaling3DMode scale_mode = rb->get_scaling_3d_mode();
+	bool use_upscaled_texture = rb->has_upscaled_texture() && (scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_FSR2 || scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_METALFX_TEMPORAL);
+	RID render_target = rb->get_render_target();
+	RID color_texture = use_upscaled_texture ? rb->get_upscaled_texture() : rb->get_internal_texture();
+	Size2i color_size = use_upscaled_texture ? target_size : rb->get_internal_size();
+
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized() && can_use_effects) {
 		float exposure = 1.0f;
 		float bloom_intensity = 0.0f;
@@ -484,17 +490,31 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 		ZeGFXD3D12Bridge::get_singleton()->execute_post_process_pass(
 				target_size.x, target_size.y, exposure, bloom_intensity, tonemap_mode, sharpen, vignette);
 
+		void *hdr_native = nullptr;
+		void *depth_native = nullptr;
+		void *normal_native = nullptr;
+		void *output_native = nullptr;
+
+		if (RD::get_singleton()) {
+			if (color_texture.is_valid()) {
+				hdr_native = (void *)RD::get_singleton()->get_driver_resource(RD::DRIVER_RESOURCE_TEXTURE, color_texture);
+			}
+			RID depth_tex = rb->get_depth_texture();
+			if (depth_tex.is_valid()) {
+				depth_native = (void *)RD::get_singleton()->get_driver_resource(RD::DRIVER_RESOURCE_TEXTURE, depth_tex);
+			}
+			if (color_texture.is_valid()) {
+				output_native = (void *)RD::get_singleton()->get_driver_resource(RD::DRIVER_RESOURCE_TEXTURE, color_texture);
+			}
+		}
+
 		// Flush all deferred ZeGFX render graph passes now that settings are finalized.
-		// D3D12 resource pointers are nullptr until RenderingDeviceDriverD3D12 provides
-		// a command list accessor — the render graph gracefully handles nullptr command lists.
 		ZeGFXD3D12Bridge::get_singleton()->flush_deferred_passes(
-				nullptr /*cmd_list*/, nullptr /*hdr_target*/, nullptr /*depth_target*/,
-				nullptr /*normal_target*/, nullptr /*output_target*/,
+				nullptr /*cmd_list*/, hdr_native, depth_native,
+				normal_native, output_native,
 				target_size.x, target_size.y, 0.016f /*delta_time ~60fps*/);
 	}
 
-	RSE::ViewportScaling3DMode scale_mode = rb->get_scaling_3d_mode();
-	bool use_upscaled_texture = rb->has_upscaled_texture() && (scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_FSR2 || scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_METALFX_TEMPORAL);
 	SpatialUpscaler *spatial_upscaler = nullptr;
 	if (can_use_effects) {
 		if (scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_FSR) {
@@ -510,10 +530,6 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 	bool use_smaa = smaa && rb->get_screen_space_aa() == RSE::VIEWPORT_SCREEN_SPACE_AA_SMAA;
 	// If doing bilinear or nearest scaling + FXAA / SMAA, the framebuffer must be scaled in a framebuffer copy after AA is applied.
 	bool using_scaling_pass = spatial_upscaler || ((use_fxaa || use_smaa) && (scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_BILINEAR || scale_mode == RSE::VIEWPORT_SCALING_3D_MODE_NEAREST));
-
-	RID render_target = rb->get_render_target();
-	RID color_texture = use_upscaled_texture ? rb->get_upscaled_texture() : rb->get_internal_texture();
-	Size2i color_size = use_upscaled_texture ? target_size : rb->get_internal_size();
 
 	bool dest_is_msaa_2d = rb->get_view_count() == 1 && texture_storage->render_target_get_msaa(render_target) != RSE::VIEWPORT_MSAA_DISABLED;
 
