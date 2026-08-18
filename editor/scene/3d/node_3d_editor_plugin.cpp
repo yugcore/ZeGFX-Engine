@@ -74,6 +74,7 @@
 #include "editor/scene/3d/gizmos/physics/ray_cast_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/physics/shape_cast_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/physics/soft_body_3d_gizmo_plugin.h"
+#include "editor/scene/3d/gizmos/physics/character_controller_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/physics/spring_arm_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/physics/vehicle_body_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/reflection_probe_gizmo_plugin.h"
@@ -2880,6 +2881,7 @@ void Node3DEditor::_register_all_gizmos() {
 	add_gizmo_plugin(Ref<SoftBody3DGizmoPlugin>(memnew(SoftBody3DGizmoPlugin)));
 	add_gizmo_plugin(Ref<ShapeCast3DGizmoPlugin>(memnew(ShapeCast3DGizmoPlugin)));
 	add_gizmo_plugin(Ref<SpringArm3DGizmoPlugin>(memnew(SpringArm3DGizmoPlugin)));
+	add_gizmo_plugin(Ref<CharacterController3DGizmoPlugin>(memnew(CharacterController3DGizmoPlugin)));
 	add_gizmo_plugin(Ref<PhysicalBone3DGizmoPlugin>(memnew(PhysicalBone3DGizmoPlugin)));
 	add_gizmo_plugin(Ref<VehicleWheel3DGizmoPlugin>(memnew(VehicleWheel3DGizmoPlugin)));
 	add_gizmo_plugin(Ref<RayCast3DGizmoPlugin>(memnew(RayCast3DGizmoPlugin)));

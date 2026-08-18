@@ -109,6 +109,7 @@
 #include "editor/scene/3d/skeleton_3d_editor_plugin.h"
 #include "editor/scene/3d/terrain_3d_editor_plugin.h"
 #include "editor/scene/3d/grass_3d_editor_plugin.h"
+#include "editor/scene/3d/foliage_3d_editor_plugin.h"
 #include "editor/scene/3d/world_partition_3d_editor_plugin.h"
 #include "editor/scene/3d/floating_origin_3d_editor_plugin.h"
 #include "editor/scene/3d/voxel_gi_editor_plugin.h"
@@ -299,6 +300,7 @@ void register_editor_types() {
 	EditorPlugins::add_by_type<Skeleton3DEditorPlugin>();
 	EditorPlugins::add_by_type<Terrain3DEditorPlugin>();
 	EditorPlugins::add_by_type<Grass3DEditorPlugin>();
+	EditorPlugins::add_by_type<Foliage3DEditorPlugin>();
 	EditorPlugins::add_by_type<WorldPartition3DEditorPlugin>();
 	EditorPlugins::add_by_type<FloatingOrigin3DEditorPlugin>();
 	EditorPlugins::add_by_type<VoxelGIEditorPlugin>();

@@ -262,6 +262,8 @@
 #include "scene/3d/path_3d.h"
 #include "scene/3d/terrain_3d.h"
 #include "scene/3d/grass_3d.h"
+#include "scene/3d/foliage_type_3d.h"
+#include "scene/3d/foliage_3d.h"
 #include "scene/3d/world_partition_3d.h"
 #include "scene/3d/reflection_probe.h"
 #include "scene/3d/remote_transform_3d.h"
@@ -346,6 +348,7 @@
 #include "scene/3d/physics/animatable_body_3d.h"
 #include "scene/3d/physics/area_3d.h"
 #include "scene/3d/physics/character_body_3d.h"
+#include "scene/3d/physics/character_controller_3d.h"
 #include "scene/3d/physics/collision_polygon_3d.h"
 #include "scene/3d/physics/collision_shape_3d.h"
 #include "scene/3d/physics/joints/cone_twist_joint_3d.h"
@@ -658,6 +661,8 @@ void register_scene_types() {
 	GDREGISTER_CLASS(MeshInstance3D);
 	GDREGISTER_CLASS(Terrain3D);
 	GDREGISTER_CLASS(Grass3D);
+	GDREGISTER_CLASS(FoliageType3D);
+	GDREGISTER_CLASS(Foliage3D);
 	GDREGISTER_CLASS(WorldPartition3D);
 	GDREGISTER_CLASS(FloatingOrigin3D);
 #ifndef DISABLE_DEPRECATED
@@ -746,6 +751,7 @@ void register_scene_types() {
 	GDREGISTER_CLASS(RigidBody3D);
 	GDREGISTER_CLASS(KinematicCollision3D);
 	GDREGISTER_CLASS(CharacterBody3D);
+	GDREGISTER_CLASS(CharacterController3D);
 	GDREGISTER_CLASS(SpringArm3D);
 
 	GDREGISTER_CLASS(PhysicalBoneSimulator3D);
