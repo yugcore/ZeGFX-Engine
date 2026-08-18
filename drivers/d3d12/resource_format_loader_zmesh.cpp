@@ -146,6 +146,7 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 			uvs2.resize(num_vertices);
 			colors.resize(num_vertices);
 
+			bool has_custom_colors = false;
 			for (uint64_t vi = 0; vi < num_vertices; ++vi) {
 				const auto *v = reinterpret_cast<const zegfx::DX12Vertex3DTextured *>(
 					vertex_data + (base_vertex + vi) * vertex_stride);
@@ -154,14 +155,32 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 
 				float nx = 0.0f, ny = 1.0f, nz = 0.0f;
 				zegfx::decodeOctahedralSNORM16(v->octNormal, nx, ny, nz);
-				normals.set(vi, Vector3(nx, ny, nz));
+				Vector3 norm(nx, ny, nz);
+				if (norm.length_squared() < 0.001f) {
+					norm = Vector3(0, 1, 0);
+				} else {
+					norm.normalize();
+				}
+				normals.set(vi, norm);
 
 				// Tangent (4-component: xyz + handedness w)
 				float tx = 1.0f, ty = 0.0f, tz = 0.0f;
 				zegfx::decodeOctahedralSNORM16(v->octTangent, tx, ty, tz);
-				tangents_arr.write[vi * 4 + 0] = tx;
-				tangents_arr.write[vi * 4 + 1] = ty;
-				tangents_arr.write[vi * 4 + 2] = tz;
+				Vector3 tan(tx, ty, tz);
+
+				// Orthonormalize tangent against normal (Gram-Schmidt)
+				tan = tan - norm * norm.dot(tan);
+				if (tan.length_squared() < 0.001f) {
+					// Compute valid perpendicular tangent vector
+					Vector3 up = Math::abs(norm.y) < 0.999f ? Vector3(0, 1, 0) : Vector3(1, 0, 0);
+					tan = norm.cross(up).normalized();
+				} else {
+					tan.normalize();
+				}
+
+				tangents_arr.write[vi * 4 + 0] = tan.x;
+				tangents_arr.write[vi * 4 + 1] = tan.y;
+				tangents_arr.write[vi * 4 + 2] = tan.z;
 				tangents_arr.write[vi * 4 + 3] = 1.0f;
 
 				float u0 = zegfx::halfToFloat(v->u);
@@ -180,10 +199,14 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 					uvs2.set(vi, Vector2(u1, v1));
 				}
 
-				float r = static_cast<float>((v->colorRgba) & 0xFF) / 255.0f;
-				float g = static_cast<float>((v->colorRgba >> 8) & 0xFF) / 255.0f;
-				float b = static_cast<float>((v->colorRgba >> 16) & 0xFF) / 255.0f;
-				float a = static_cast<float>((v->colorRgba >> 24) & 0xFF) / 255.0f;
+				uint32_t c = v->colorRgba;
+				if (c != 0 && c != 0xFFFFFFFF) {
+					has_custom_colors = true;
+				}
+				float r = (c == 0) ? 1.0f : static_cast<float>((c) & 0xFF) / 255.0f;
+				float g = (c == 0) ? 1.0f : static_cast<float>((c >> 8) & 0xFF) / 255.0f;
+				float b = (c == 0) ? 1.0f : static_cast<float>((c >> 16) & 0xFF) / 255.0f;
+				float a = (c == 0) ? 1.0f : static_cast<float>((c >> 24) & 0xFF) / 255.0f;
 				colors.set(vi, Color(r, g, b, a));
 			}
 
@@ -204,77 +227,88 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 			arrays[Mesh::ARRAY_TANGENT] = tangents_arr;
 			arrays[Mesh::ARRAY_TEX_UV] = uvs;
 			arrays[Mesh::ARRAY_TEX_UV2] = uvs2;
-			arrays[Mesh::ARRAY_COLOR] = colors;
+			if (has_custom_colors) {
+				arrays[Mesh::ARRAY_COLOR] = colors;
+			}
 			arrays[Mesh::ARRAY_INDEX] = local_indices;
 
 			mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
 
 			// Automatically resolve and bind companion .zmat material
 			int32_t slot_idx = prims[p].MaterialSlotIndex;
-			print_line(vformat("[ZeGFX ZMESH] Surface %d: MaterialSlotIndex=%d, prim_count=%d", p, slot_idx, prim_count));
-
+			String slot_name;
 			if (slot_idx >= 0 && slot_idx < (int32_t)mat_slot_count) {
-				// SlotName is a fixed 64-byte char array — create String carefully
-				String slot_name;
 				const char *raw = slots[slot_idx].SlotName;
 				int slen = 0;
 				while (slen < 64 && raw[slen] != '\0') slen++;
 				if (slen > 0) {
 					slot_name = String::utf8(raw, slen).strip_edges();
 				}
+			}
 
-				print_line(vformat("[ZeGFX ZMESH] Surface %d: SlotName='%s' (len=%d)", p, slot_name, slen));
+			String base_dir = p_path.get_base_dir();
+			String mesh_base = p_path.get_file().get_basename();
+			Ref<Material> mat;
 
-				String base_dir = p_path.get_base_dir();
-				Ref<Material> mat;
-
-				Vector<String> zmat_search_paths;
-				if (!slot_name.is_empty()) {
-					zmat_search_paths.push_back(base_dir.path_join(slot_name + ".zmat"));
-					zmat_search_paths.push_back(base_dir.path_join("Materials").path_join(slot_name + ".zmat"));
-				}
+			Vector<String> zmat_search_paths;
+			if (!slot_name.is_empty()) {
+				zmat_search_paths.push_back(base_dir.path_join(slot_name + ".zmat"));
+				zmat_search_paths.push_back(base_dir.path_join("Materials").path_join(slot_name + ".zmat"));
+			}
+			if (slot_idx >= 0) {
 				zmat_search_paths.push_back(base_dir.path_join(vformat("Material_%d.zmat", slot_idx)));
 				zmat_search_paths.push_back(base_dir.path_join("Materials").path_join(vformat("Material_%d.zmat", slot_idx)));
+			}
+			zmat_search_paths.push_back(base_dir.path_join(mesh_base + ".zmat"));
+			zmat_search_paths.push_back(base_dir.path_join("Materials").path_join(mesh_base + ".zmat"));
+			zmat_search_paths.push_back(base_dir.path_join("Material_0.zmat"));
 
-				for (int i = 0; i < zmat_search_paths.size(); ++i) {
-					if (FileAccess::exists(zmat_search_paths[i])) {
-						mat = ResourceLoader::load(zmat_search_paths[i]);
-						if (mat.is_valid()) {
-							print_line(vformat("[ZeGFX ZMESH] Found zmat via direct path: '%s'", zmat_search_paths[i]));
-							break;
-						}
+			for (int i = 0; i < zmat_search_paths.size(); ++i) {
+				if (FileAccess::exists(zmat_search_paths[i])) {
+					mat = ResourceLoader::load(zmat_search_paths[i]);
+					if (mat.is_valid()) {
+						print_line(vformat("[ZeGFX ZMESH] Found zmat via direct path: '%s'", zmat_search_paths[i]));
+						break;
 					}
 				}
+			}
 
-				if (mat.is_null()) {
-					// Scan base_dir and Materials subfolder
-					Vector<String> scan_dirs;
-					scan_dirs.push_back(base_dir);
-					scan_dirs.push_back(base_dir.path_join("Materials"));
-					for (int d = 0; d < scan_dirs.size(); ++d) {
-						Ref<DirAccess> da = DirAccess::open(scan_dirs[d]);
-						if (da.is_null()) continue;
-						da->list_dir_begin();
-						String f = da->get_next();
-						while (!f.is_empty()) {
-							if (!da->current_is_dir() && f.get_extension().to_lower() == "zmat") {
-								String fn = f.get_basename().to_lower();
-								String sn = slot_name.to_lower();
-								if (!sn.is_empty() && (fn.contains(sn) || sn.contains(fn))) {
-									mat = ResourceLoader::load(scan_dirs[d].path_join(f));
-									if (mat.is_valid()) break;
-								}
+			if (mat.is_null()) {
+				// Scan base_dir and Materials subfolder
+				Vector<String> scan_dirs;
+				scan_dirs.push_back(base_dir);
+				scan_dirs.push_back(base_dir.path_join("Materials"));
+				for (int d = 0; d < scan_dirs.size(); ++d) {
+					Ref<DirAccess> da = DirAccess::open(scan_dirs[d]);
+					if (da.is_null()) continue;
+					da->list_dir_begin();
+					String f = da->get_next();
+					String first_zmat;
+					while (!f.is_empty()) {
+						if (!da->current_is_dir() && f.get_extension().to_lower() == "zmat") {
+							if (first_zmat.is_empty()) first_zmat = scan_dirs[d].path_join(f);
+							String fn = f.get_basename().to_lower();
+							String sn = slot_name.to_lower();
+							String mb = mesh_base.to_lower();
+							if ((!sn.is_empty() && (fn.contains(sn) || sn.contains(fn))) ||
+								(!mb.is_empty() && (fn.contains(mb) || mb.contains(fn)))) {
+								mat = ResourceLoader::load(scan_dirs[d].path_join(f));
+								if (mat.is_valid()) break;
 							}
-							f = da->get_next();
 						}
+						f = da->get_next();
+					}
+					if (mat.is_valid()) break;
+					if (mat.is_null() && !first_zmat.is_empty()) {
+						mat = ResourceLoader::load(first_zmat);
 						if (mat.is_valid()) break;
 					}
 				}
+			}
 
-				if (mat.is_valid()) {
-					mesh->surface_set_material(p, mat);
-					print_line(vformat("[ZeGFX ZMESH] Bound material '%s' to surface %d", slot_name, p));
-				}
+			if (mat.is_valid()) {
+				mesh->surface_set_material(p, mat);
+				print_line(vformat("[ZeGFX ZMESH] Bound material '%s' to surface %d", slot_name.is_empty() ? mesh_base : slot_name, p));
 			}
 		}
 	}
@@ -403,6 +437,9 @@ static Ref<Texture2D> _load_texture_robust(const String &p_path) {
 		Ref<Image> img;
 		img.instantiate();
 		if (img->load(global_p) == OK && !img->is_empty()) {
+			if (img->get_mipmap_count() == 0 && img->get_width() > 1 && img->get_height() > 1) {
+				img->generate_mipmaps();
+			}
 			return ImageTexture::create_from_image(img);
 		}
 	}
@@ -498,16 +535,28 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 				// Read constant buffer (PBR parameters)
 				if (meta->ConstantBufferBytes >= 36 && offset + meta->ConstantBufferBytes <= file_len) {
 					const float *cb = reinterpret_cast<const float *>(data + offset);
-					mat->set_albedo(Color(cb[0], cb[1], cb[2], cb[3]).linear_to_srgb());
+					// Constant buffer parameters from GLTF/FBX are ALREADY in linear space.
+					Color albedo_col = Color(cb[0], cb[1], cb[2], cb[3]);
+					if (albedo_col.r <= 0.001f && albedo_col.g <= 0.001f && albedo_col.b <= 0.001f) {
+						albedo_col = Color(1.0f, 1.0f, 1.0f, 1.0f);
+					}
+					mat->set_albedo(albedo_col);
 					if (cb[4] > 0.001f || cb[5] > 0.001f || cb[6] > 0.001f) {
-						mat->set_emission(Color(cb[4], cb[5], cb[6]).linear_to_srgb());
+						mat->set_emission(Color(cb[4], cb[5], cb[6]));
 						mat->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
 					}
 					mat->set_metallic(cb[7]);
-					mat->set_roughness(cb[8]);
+					float roughness_val = cb[8];
+					if (roughness_val <= 0.001f) {
+						roughness_val = 1.0f;
+					}
+					mat->set_roughness(roughness_val);
 
 					if (meta->BlendMode == 2) {
 						mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
+					} else if (meta->BlendMode == 1) {
+						mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA_SCISSOR);
+						mat->set_alpha_scissor_threshold(0.5f);
 					}
 					if (meta->RasterizerState == 1) {
 						mat->set_cull_mode(BaseMaterial3D::CULL_DISABLED);
@@ -535,9 +584,9 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 									print_line(vformat("[ZeGFX ZMAT] Found & loaded bound texture: '%s'", full_p));
 									break;
 								}
-								// Try with .ztex / .zetex / .png
+								// Try with .ztex / .zetex / .png / .jpg / .tga / .dds / .webp
 								String base_t = tex_filename.get_basename();
-								for (const char* ext : {".ztex", ".zetex", ".png", ".jpg", ".dds"}) {
+								for (const char* ext : {".ztex", ".zetex", ".png", ".jpg", ".jpeg", ".tga", ".dds", ".webp", ".exr"}) {
 									String alt_p = search_dirs[d].path_join(base_t + ext);
 									tex = _load_texture_robust(alt_p);
 									if (tex.is_valid()) {
@@ -550,21 +599,29 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 						}
 
 						if (tex.is_valid()) {
-							if (param_name == "Albedo" || param_name.to_lower().contains("albedo") || param_name.to_lower().contains("diffuse") || param_name.to_lower().contains("basecolor")) {
+							String p_lower = param_name.to_lower();
+							bool is_albedo = (param_name == "Albedo" || p_lower.contains("albedo") || p_lower.contains("diffuse") || p_lower.contains("basecolor") || p_lower.contains("base_color") || param_name == "#D2077977");
+							bool is_normal = (param_name == "Normal" || p_lower.contains("normal") || param_name == "#459A0837");
+							bool is_orm = (param_name == "OcclusionRoughnessMetallic" || param_name == "ORM" || param_name == "#F6A8B084");
+							bool is_rough_metal = (param_name == "RoughnessMetallic" || p_lower.contains("rough") || p_lower.contains("arm") || p_lower.contains("orm") || param_name == "#4F1BF470");
+							bool is_metal = (param_name == "Metallic" || param_name == "Metalness" || p_lower.contains("metal") || param_name == "#E1A17BA2");
+							bool is_ao = (param_name == "AmbientOcclusion" || param_name == "occlusionTexture" || p_lower.contains("occlusion") || p_lower == "ao" || param_name == "#3D7A4F23");
+							bool is_emiss = (param_name == "Emissive" || p_lower.contains("emiss") || param_name == "#E821C8A1");
+
+							if (is_albedo) {
 								albedo_tex = tex;
-							} else if (param_name == "Normal" || param_name.to_lower().contains("normal")) {
+							} else if (is_normal) {
 								normal_tex = tex;
-							} else if (param_name == "OcclusionRoughnessMetallic" || param_name == "ORM") {
-								// Single packed texture: Occlusion(R) / Roughness(G) / Metallic(B).
-								// Metallic falls through to the existing "borrow BLUE channel from
-								// rough_tex" logic further down if no separate metal_tex is bound.
+							} else if (is_orm) {
 								rough_tex = tex;
 								ao_tex = tex;
-							} else if (param_name == "RoughnessMetallic" || param_name.to_lower().contains("rough") || param_name.to_lower().contains("arm") || param_name.to_lower().contains("orm")) {
+							} else if (is_metal) {
+								metal_tex = tex;
+							} else if (is_rough_metal) {
 								rough_tex = tex;
-							} else if (param_name == "AmbientOcclusion" || param_name == "occlusionTexture" || param_name.to_lower().contains("occlusion")) {
+							} else if (is_ao) {
 								ao_tex = tex;
-							} else if (param_name == "Emissive" || param_name.to_lower().contains("emiss")) {
+							} else if (is_emiss) {
 								emit_tex = tex;
 							}
 						}
@@ -593,7 +650,7 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 		while (!f_name.is_empty()) {
 			if (!da->current_is_dir()) {
 				String ext = f_name.get_extension().to_lower();
-				if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "exr" || ext == "webp" || ext == "dds" || ext == "ztex" || ext == "zetex") {
+				if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "exr" || ext == "webp" || ext == "dds" || ext == "tga" || ext == "ztex" || ext == "zetex") {
 					String fn_lower = f_name.to_lower();
 					String full_path = search_dirs[d].path_join(f_name);
 					all_candidate_images.push_back(full_path);
@@ -621,7 +678,7 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 					}
 
 					if (matches_mat) {
-						if (albedo_tex.is_null() && (fn_lower.contains("basecolor") || fn_lower.contains("base_color") || fn_lower.contains("diff") || fn_lower.contains("albedo") || fn_lower.contains("color"))) {
+						if (albedo_tex.is_null() && (fn_lower.contains("basecolor") || fn_lower.contains("base_color") || fn_lower.contains("diff") || fn_lower.contains("albedo") || fn_lower.contains("color") || fn_lower.contains("alb"))) {
 							albedo_tex = _load_texture_robust(full_path);
 						} else if (normal_tex.is_null() && (fn_lower.contains("normal") || fn_lower.contains("nor_gl") || fn_lower.contains("nor") || fn_lower.contains("nrm"))) {
 							normal_tex = _load_texture_robust(full_path);
@@ -645,12 +702,21 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 	}
 
 	// Fallback for generic materials (e.g. Material.001, Checker, Door, Window) if no specific texture match
-	if (albedo_tex.is_null() && !all_candidate_images.is_empty()) {
+	if (!all_candidate_images.is_empty()) {
 		for (int i = 0; i < all_candidate_images.size(); ++i) {
 			String fn = all_candidate_images[i].to_lower();
-			if (albedo_tex.is_null() && (fn.contains("image_") || fn.contains("diff") || fn.contains("basecolor") || fn.contains("color"))) {
+			if (albedo_tex.is_null() && (fn.contains("image_") || fn.contains("diff") || fn.contains("basecolor") || fn.contains("base_color") || fn.contains("albedo") || fn.contains("color") || fn.contains("alb"))) {
 				albedo_tex = _load_texture_robust(all_candidate_images[i]);
-				break;
+			} else if (normal_tex.is_null() && (fn.contains("normal") || fn.contains("nor_gl") || fn.contains("nor") || fn.contains("nrm"))) {
+				normal_tex = _load_texture_robust(all_candidate_images[i]);
+			} else if (rough_tex.is_null() && (fn.contains("roughness") || fn.contains("rough") || fn.contains("arm") || fn.contains("orm") || fn.contains("rgh"))) {
+				rough_tex = _load_texture_robust(all_candidate_images[i]);
+			} else if (metal_tex.is_null() && (fn.contains("metallic") || fn.contains("metal") || fn.contains("met"))) {
+				metal_tex = _load_texture_robust(all_candidate_images[i]);
+			} else if (ao_tex.is_null() && (fn.contains("occlusion") || fn.contains("_ao") || fn.contains("ao_") || fn.contains("ao."))) {
+				ao_tex = _load_texture_robust(all_candidate_images[i]);
+			} else if (emit_tex.is_null() && (fn.contains("emissive") || fn.contains("emission") || fn.contains("emit"))) {
+				emit_tex = _load_texture_robust(all_candidate_images[i]);
 			}
 		}
 	}

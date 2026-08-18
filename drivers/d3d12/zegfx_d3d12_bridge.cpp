@@ -117,15 +117,25 @@ bool ZeGFXD3D12Bridge::dxr_reflections_active() const {
 
 // --- Phase 1: Shadow pass — computes ZeGFX Log-Linear PSSM splits & contact hardening distribution ---
 bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits) {
-	if (!initialized) {
+	if (!initialized || p_cascade_count <= 1) {
 		return false;
 	}
 	r_splits.clear();
+<<<<<<< HEAD
 	float lambda = 0.85f; // High-density near-cascade distribution
+=======
+
+	// Guard against non-positive near clip (e.g. orthogonal projections or near=0) to prevent NaN/Div0
+	float safe_near = std::max(0.05f, p_near_clip);
+	float safe_far = std::max(safe_near + 1.0f, p_far_clip);
+
+	// Balanced log-linear split parameter (0.55 provides sharp near-detail without starving mid/far cascades)
+	float lambda = 0.55f;
+>>>>>>> 62cb79ed41 (First/Third Person Node Implemented V2)
 	for (uint32_t i = 1; i < p_cascade_count; i++) {
 		float fi = static_cast<float>(i) / static_cast<float>(p_cascade_count);
-		float log_split = p_near_clip * std::pow(p_far_clip / p_near_clip, fi);
-		float lin_split = p_near_clip + (p_far_clip - p_near_clip) * fi;
+		float log_split = safe_near * std::pow(safe_far / safe_near, fi);
+		float lin_split = safe_near + (safe_far - safe_near) * fi;
 		float split = lambda * log_split + (1.0f - lambda) * lin_split;
 		r_splits.push_back(split);
 	}
