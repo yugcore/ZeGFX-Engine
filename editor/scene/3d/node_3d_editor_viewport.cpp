@@ -4550,6 +4550,29 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 				}
 			}
 		} break;
+		case VIEW_QUALITY_LOW:
+		case VIEW_QUALITY_MEDIUM:
+		case VIEW_QUALITY_HIGH:
+		case VIEW_QUALITY_ULTRA: {
+			if (quality_submenu) {
+				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_LOW), p_option == VIEW_QUALITY_LOW);
+				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_MEDIUM), p_option == VIEW_QUALITY_MEDIUM);
+				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_HIGH), p_option == VIEW_QUALITY_HIGH);
+				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_ULTRA), p_option == VIEW_QUALITY_ULTRA);
+			}
+			RSE::GraphicsPreset preset = RSE::GRAPHICS_PRESET_HIGH;
+			if (p_option == VIEW_QUALITY_LOW) {
+				preset = RSE::GRAPHICS_PRESET_LOW;
+			} else if (p_option == VIEW_QUALITY_MEDIUM) {
+				preset = RSE::GRAPHICS_PRESET_MEDIUM;
+			} else if (p_option == VIEW_QUALITY_HIGH) {
+				preset = RSE::GRAPHICS_PRESET_HIGH;
+			} else if (p_option == VIEW_QUALITY_ULTRA) {
+				preset = RSE::GRAPHICS_PRESET_ULTRA;
+			}
+			RenderingServer::get_singleton()->graphics_preset_apply(preset);
+			set_message(vformat(TTR("Graphics Quality Preset: %s"), (p_option == VIEW_QUALITY_LOW) ? "Low" : (p_option == VIEW_QUALITY_MEDIUM) ? "Medium" : (p_option == VIEW_QUALITY_HIGH) ? "High" : "Ultra"), 3);
+		} break;
 		case VIEW_GIZMOS: {
 			int idx = view_display_menu->get_popup()->get_item_index(VIEW_GIZMOS);
 			bool current = view_display_menu->get_popup()->is_item_checked(idx);
@@ -6851,6 +6874,16 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Internal Buffer"), VIEW_DISPLAY_INTERNAL_BUFFER, SupportedRenderingMethods::FORWARD_PLUS_MOBILE,
 			TTRC("Shows the scene rendered in linear colorspace before any tonemapping or post-processing."));
 	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Display Advanced..."), display_submenu, VIEW_DISPLAY_ADVANCED);
+
+	quality_submenu = memnew(PopupMenu);
+	quality_submenu->set_hide_on_checkable_item_selection(false);
+	quality_submenu->add_radio_check_item(TTRC("Low"), VIEW_QUALITY_LOW);
+	quality_submenu->add_radio_check_item(TTRC("Medium"), VIEW_QUALITY_MEDIUM);
+	quality_submenu->add_radio_check_item(TTRC("High"), VIEW_QUALITY_HIGH);
+	quality_submenu->add_radio_check_item(TTRC("Ultra"), VIEW_QUALITY_ULTRA);
+	quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_HIGH), true);
+	quality_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
+	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Quality Preset..."), quality_submenu);
 
 	view_display_menu->get_popup()->add_separator();
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_environment", TTRC("View Environment")), VIEW_ENVIRONMENT);

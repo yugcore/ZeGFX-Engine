@@ -227,8 +227,11 @@ void main() {
 	float accum = 1.0;
 
 	float radius = params.blur_scale;
-	for (float ang = 0.0; radius < params.blur_size; ang += GOLDEN_ANGLE) {
-		vec2 uv_adj = uv + vec2(cos(ang), sin(ang)) * pixel_size * radius;
+	float start_ang = params.use_jitter ? (hash12n(uv + vec2(params.jitter_seed)) * 6.28318530718) : 0.0;
+	float jitter_rad = params.use_jitter ? ((hash12n(uv * 1.6180339887 + vec2(params.jitter_seed)) - 0.5) * params.blur_scale * 0.5) : 0.0;
+
+	for (float ang = start_ang; radius < params.blur_size; ang += GOLDEN_ANGLE) {
+		vec2 uv_adj = uv + vec2(cos(ang), sin(ang)) * pixel_size * max(0.0, radius + jitter_rad);
 
 		vec4 sample_color = texture(source_color, uv_adj);
 		sample_color.a = texture(source_weight, uv_adj).r;

@@ -2,170 +2,251 @@
 
 Welcome to the official engine documentation for the **ZeGFX Direct3D 12 Graphics Engine** powering Velvet Engine.
 
-ZeGFX is a modern, high-performance C++20 rendering backend built on **Direct3D 12 (DX12)** and **DirectX Raytracing (DXR 1.1)**. It features an asynchronous Render Graph DAG compiler, zero-allocation upload ring buffers, clustered deferred PBR shading, 3D froxel volumetric fog, ground-truth occlusion, virtual geometry meshlet culling, and real-time probe-based Global Illumination (ZGI).
+ZeGFX is a modern, high-performance C++20 rendering backend built on **Direct3D 12 (DX12)**, **Clustered Forward+ RD**, and **DirectX Raytracing (DXR 1.1)**. It features an asynchronous Render Graph DAG compiler, unified graphics quality presets, 128-tap Vogel Disk PCSS soft shadows, ACES Fitted HDR tonemapping, 3D raymarched volumetric clouds, a 24-hour astronomical celestial time-of-day system, dynamic weather state management with PBR surface wetness, subpixel Halton TAA + AMD FSR 2.2, and 16x anisotropic PBR shading.
 
 ---
 
 ## 1. High-Level Engine Architecture
 
-ZeGFX interfaces directly with the native Win32 window subsystem and replaces legacy rendering abstractions with a unified Direct3D 12 hardware pipeline:
+ZeGFX interfaces directly with the native Win32 window subsystem and provides a unified, AAA-grade Direct3D 12 and Clustered Forward+ hardware pipeline:
 
 ```
-+-------------------------------------------------------------------------+
-|                        VELVET ENGINE EDITOR & APP                       |
-|      (Editor UI / Viewports / Node3D / WorldEnvironment / Inspector)    |
-+------------------------------------+------------------------------------+
-                                     |
-                                     v (Scene Snapshot & HWND Window)
-+------------------------------------+------------------------------------+
-|                      ZEGFX ENGINE BRIDGE LAYER                          |
-|         (zegfx_d3d12_bridge / renderer_scene_d3d12 / volumetrics)       |
-+------------------------------------+------------------------------------+
-                                     |
-                                     v (Asynchronous Pass Dispatch)
-+------------------------------------+------------------------------------+
-|                       ZEGFX D3D12 GRAPHICS ENGINE                       |
-|  - Low-Level D3D12 Hardware RHI & Command Queues (ID3D12Device5)        |
-|  - Asynchronous Render Graph & Automatic Subresource Barriers           |
-|  - Triple-Buffered Upload Ring Allocators (FRAME_COUNT = 3)             |
-|  - Descriptor Heap Managers & Delayed Free-List Release                 |
-|  - Pipeline State Object (PSO) Binary Disk Caching (dx12_psos.bin)      |
-|  - PBR Clustered Deferred G-Buffer (Depth32 / RGBA16F / RGBA8)          |
-|  - Tile-Based Compute Light Grid Culler (16x16 Tiles, 256 lights)       |
-|  - Virtual Shadow Maps (VSM) & 4-Cascade PCF Atlases                    |
-|  - 3D Texture Froxel Volumetric Fog & Light Shaft Raymarching           |
-|  - Ground Truth Ambient Occlusion (GTAO) & Screen-Space Reflections     |
-|  - Virtual Geometry Meshlet Cluster Culling & ExecuteIndirect MDI       |
-|  - DXR 1.1 Hardware Ray Tracing (Raytraced Shadows, RTR, RTAO, ZGI GI)  |
-+-------------------------------------------------------------------------+
++---------------------------------------------------------------------------------------------------+
+|                                     VELVET ENGINE APPLICATION & EDITOR                            |
+|        (3D Viewport / WorldEnvironment / Terrain3D / TimeOfDay3D / VolumetricClouds3D / UI)       |
++--------------------------------------------------+------------------------------------------------+
+                                                   |
+                                                   v (Scene Hierarchy, Scenario & Settings)
++--------------------------------------------------+------------------------------------------------+
+|                                        RENDERING SERVER CORE                                      |
+|  - Unified Graphics Quality Presets Engine (Low / Medium / High / Ultra)                          |
+|  - Scene Culling, Camera Frustum & PSSM Logarithmic Split Manager                                 |
+|  - Global Shader Parameter System (Weather Wetness, Puddles, Celestial Ephemeris)                 |
++--------------------------------------------------+------------------------------------------------+
+                                                   |
+                                                   v (Asynchronous Frame Commands)
++--------------------------------------------------+------------------------------------------------+
+|                                    ZEGFX D3D12 & CLUSTERED RD PIPELINE                            |
+|  - D3D12 Native Device RHI (ID3D12Device5) & Win32 Direct Swapchain                               |
+|  - Asynchronous Render Graph DAG Compiler & Automatic Resource Barrier Tracker                    |
+|  - 128-Tap Vogel Disk PCSS Soft Contact-Hardening Shadows + Screen-Space Contact Shadows (SSCS)   |
+|  - High-Density 3D Froxel Volumetric Fog Grid (256x128 Depth Slices on Ultra)                     |
+|  - Horizon-Based GTAO / SSAO with Multi-Pass Edge-Aware Bilateral Filter                          |
+|  - GGX Microfacet Screen-Space Reflections (SSR) with Full-Resolution Raymarch                    |
+|  - 3D Raymarched Volumetric Clouds (Perlin-Worley Erosion, Powder Effect, Mie Silver Lining)     |
+|  - 24-Hour Astronomical Celestial Ephemeris (Sun/Moon Arcs, Kelvin Temperature Curve, Stars Dome) |
+|  - Dynamic Weather Controller with PBR Surface Wetness Darkening & Puddle Accumulation            |
+|  - ACES Fitted HDR Tonemapper, 3D LUT Color Grading & Dual-Filter Bloom (Karis Firefly Filter)    |
+|  - Optical Bokeh Depth of Field with Golden-Angle Jittered Sampling (Zero Ring Banding)          |
+|  - Subpixel Halton Jitter TAA (9-Tap Catmull-Rom History + Variance Clipping) + Native AMD FSR 2.2|
+|  - Tokuyoshi & Kaplanyan Specular Roughness Limiter (Zero Normal-Map Shimmer)                    |
+|  - 16x Anisotropic Texture Filtering on PBR Materials, Decals, and Projectors                    |
+|  - Filament / Kulla-Conty Microfacet Multi-Scatter Energy Compensation                            |
+|  - Jimenez Separable 25-Tap Multi-Dipole Subsurface Scattering (SSS)                              |
+|  - DXR 1.1 Hardware Ray Tracing Acceleration Structures (BLAS/TLAS) & ZGI Probe Grid              |
++---------------------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Core Driver & Memory Subsystems
+## 2. Unified Graphics Quality Preset System
 
-### Direct3D 12 Hardware RHI
-* **Low-Level Native Device**: Owns Direct3D 12 device creation (`ID3D12Device5`), DXGI factory swapchains, direct command queues, and hardware adapter selection.
-* **Win32 Integration**: Binds native window handles (`HWND`) directly to DXGI swapchain buffers without intermediate copying.
-* **How to Verify**: Driver selection defaults to `d3d12` on Windows. Verify in **Project Settings -> Rendering -> Rendering Device -> Driver.Windows**.
+ZeGFX features an engine-wide **Unified Graphics Quality Preset** architecture supporting **`Low`**, **`Medium`**, **`High`**, and **`Ultra`** profiles.
 
-### Triple-Buffered Upload Ring Allocator
-* **Zero CPU-GPU Stalls**: Dynamically suballocates CPU-to-GPU uploads across `FRAME_COUNT = 3` in-flight frame slots.
-* **Fence Tracking**: Advances slots only when `completedFenceValue >= slot.fenceValue`, ensuring zero buffer overwrites during dynamic vertex, index, font texture, and uniform buffer updates.
-* **How to Use**: Operates 100% automatically under the hood.
+### Preset Fidelity Matrix
 
-### Render Graph & Automatic Barrier Engine
-* **Asynchronous DAG Compilation**: Builds directed acyclic graphs (DAG) for all rendering and compute passes, aliasing transient memory targets to reduce VRAM footprint.
-* **Automated Subresource Barriers**: Automatically tracks resource states (`RenderTarget`, `DepthWrite`, `PixelShaderResource`, `UnorderedAccess`, `CopySrc`/`CopyDest`) and injects minimal `D3D12_RESOURCE_BARRIER` transitions.
+| Subsystem | Low | Medium | High *(Default)* | Ultra |
+| :--- | :--- | :--- | :--- | :--- |
+| **Directional Shadow Atlas** | 2048 | 4096 | 4096 | **8192** |
+| **Shadow Filter Quality** | 16-Tap PCF | 32-Tap PCF | 64-Tap Vogel Disk | **128-Tap Vogel PCSS** |
+| **Screen-Space Contact Shadows** | Off | Fast (0.15) | Active (0.35) | **High-Res (0.50)** |
+| **Volumetric Fog Froxel Grid** | $32 \times 32$ | $64 \times 64$ | $128 \times 64$ | **$256 \times 128$** |
+| **SSAO / GTAO Quality** | Very Low (Half-Res, 1 Blur) | Medium (Half-Res, 2 Blur) | High (Full-Res, 3 Blur) | **Ultra (Full-Res, 4 Blur)** |
+| **SSIL Quality** | Very Low | Medium | High | **Ultra** |
+| **Screen-Space Reflections (SSR)** | Half-Res (Fast) | Half-Res (Filtered) | Full-Res GGX | **Full-Res GGX (Max Steps)** |
+| **SDFGI Global Illumination** | 8 Rays / 5 Frames | 16 Rays / 10 Frames | 64 Rays / 20 Frames | **128 Rays / 30 Frames** |
+| **Subsurface Scattering (SSS)** | Low (11 Samples) | Medium (17 Samples) | High (25 Samples) | **Ultra (25 Samples Full-Res)**|
+| **Anisotropic Filtering** | 4x | 8x | 16x | **16x** |
+| **Decal / Projector Filter** | Linear Mipmaps | Linear Mipmaps | 16x Anisotropic | **16x Anisotropic** |
+| **Optical Bokeh DoF** | Circle (Fast) | Circle + Jitter | Circle + Jitter (HQ) | **Circle + Jitter (HQ Max)** |
 
-### Binary PSO Disk Caching
-* **Hitch-Free Compilation**: Prewarms and serializes compiled D3D12 Pipeline State Objects (PSOs) to disk (`%LOCALAPPDATA%\ZeGFX\shader_cache\dx12_psos.bin`), eliminating shader compilation stutter.
+### How to Control Presets in Editor & Code
 
----
+1. **In the 3D Viewport Header**:
+   * Click **`[View]`** (top-left of 3D Viewport) -> **`Quality Preset...`** -> Select **`Low`**, **`Medium`**, **`High`**, or **`Ultra`**.
+   * An on-screen notification toast will confirm the switch with instant real-time visual feedback.
+2. **In Project Settings**:
+   * Open **Project Settings -> Rendering -> Quality -> Preset** -> Choose default starting preset.
+3. **In GDScript / Runtime**:
+   ```gdscript
+   extends Node
 
-## 3. Clustered Deferred Shading Engine
-
-### Multi-Render-Target (MRT) G-Buffer Formats
-ZeGFX decomposes opaque geometry rendering into dedicated high-precision G-Buffer channels:
-* **`GBufferA` (`RGBA8_UNorm`)**: Base Albedo Color (RGB) + Alpha (A).
-* **`GBufferB` (`RGBA16_Float`)**: High-precision World-Space Surface Normals.
-* **`GBufferC` (`RGBA8_UNorm`)**: Roughness (R), Metallic (G), Ambient Occlusion (B).
-* **`GBufferD` (`RGBA16_Float`)**: Emissive Color + Motion Vectors.
-* **`DepthTarget` (`D32_Float`)**: Linearized 32-bit Depth Stencil Target.
-
-### 16x16 Tile Compute Light Culling
-* **High Multi-Light Scalability**: Divides screen space into `16x16` pixel tiles and dispatches a compute shader to cull point (`OmniLight3D`) and spot (`SpotLight3D`) lights against min/max tile depth bounds.
-* **Performance**: Renders scenes with hundreds of dynamic point and spot lights at 60+ FPS in a single deferred shading pass.
-* **How to Use**: Add `OmniLight3D` or `SpotLight3D` nodes anywhere in your scene; lighting is automatically batched into tile grids.
-
----
-
-## 4. Atmosphere, Volumetrics & Shadow Systems
-
-### 3D Texture Froxel Volumetric Fog & Light Shafts
-* **3D Froxel Grid**: Generates a `160x90x128` 3D froxel volume in view space using a two-pass compute shader (`volumetric_inject.hlsl` + `volumetric_integrate.hlsl`).
-* **Volumetric Light Shafts (God Rays)**: Computes in-scattering and transmittance along camera Z-slices, producing smooth volumetric light shafts behind light blockers.
-* **How to Configure in Editor**:
-  1. Add a **`WorldEnvironment`** node to your scene.
-  2. In the Inspector, expand **Environment -> Volumetric Fog**:
-     - Check **Enabled** = `ON`
-     - Set **Density** = `0.04`
-     - Set **Anisotropy** = `0.7` *(directs scattered light toward camera)*
-  3. Select your **`DirectionalLight3D`**:
-     - Check **Shadow -> Enabled** = `ON`
-     - Set **Volumetric Fog Energy** = `2.0`
-  4. Place a 3D mesh (e.g. `CSGBox3D`) between the sun and camera to see 3D god rays.
-
-### Virtual Shadow Maps (VSM) & 4-Cascade PCF Atlases
-* **Cascaded Directional Shadows**: Maps directional light shadows across 4 view-frustum splits with Percentage-Closer Filtering (PCF) blending.
-* **Virtual Shadow Maps (VSM)**: Allocates shadow pages dynamically based on camera visibility.
-* **How to Inspect in Editor**:
-  1. Select a **`DirectionalLight3D`** node and set **Directional Shadow -> Mode** to `4 Cascades`.
-  2. Click **Perspective -> Display Advanced... -> Directional Shadow Splits** in the 3D Viewport header menu to view the 4 colored frustum splits (Cascade 0: Red, Cascade 1: Green, Cascade 2: Blue, Cascade 3: Yellow).
+   func _ready():
+       # Switch to Ultra Preset
+       RenderingServer.graphics_preset_apply(RenderingServer.GRAPHICS_PRESET_ULTRA)
+       print("Current Graphics Preset: ", RenderingServer.graphics_preset_get())
+   ```
 
 ---
 
-## 5. Occlusion & Post-Processing Suite
+## 3. Sky, Atmosphere, Volumetric Clouds & Dynamic Weather
 
-### Ground Truth Ambient Occlusion (GTAO)
-* **Horizon Search Occlusion**: Replaces legacy SSAO with horizon-based GTAO compute searches (`gtao.hlsl`) and spatial bilateral filtering.
-* **Visual Quality**: Generates dark, physically accurate contact shadows in fine crevices without haloing around thin geometry.
-* **How to Enable**: Check **Environment -> SSAO** in the `WorldEnvironment` Inspector.
+### 3.1 3D Raymarched Volumetric Clouds (`VolumetricClouds3D`)
+The `VolumetricClouds3D` node renders realistic 3D volumetric cloud layers using dual-layer raymarching and physical optics:
+* **Perlin-Worley 3D Detail Erosion**: Dense cumulus cloud formations with natural billowing and edge wisps.
+* **Optical Physics**: Beer-Lambert light absorption ($e^{-\sigma_t d}$), Henyey-Greenstein forward Mie phase function (solar silver lining highlights), and powder-sugar multi-scattering approximation.
+* **Dynamic Wind Drift**: Real-time cloud evolution and drift along 3D wind velocity vectors.
+* **Moving Ground Shadows**: Projects top-down cloud transmittance directly onto the terrain and directional shadow cascades.
 
-### Screen-Space Raymarched Reflections (SSR)
-* **View-Space Raytracing**: Traces reflection rays in view space using hierarchical depth buffers and binary search refinement, blending smoothly into environment probes at screen boundaries.
-* **How to Enable**: Check **Environment -> SSR** in the `WorldEnvironment` Inspector.
-
-### Dual-Filter Bloom & Auto-Exposure
-* **Dual-Filter Bloom**: Generates a 5-mip downsample/upsample compute blur pyramid to create smooth glow highlights around bright light sources.
-* **Histogram Auto-Exposure**: Computes a 256-bin luminance histogram with smooth temporal adaptation over ~1 second.
-* **ACES Tonemapping**: Maps HDR scene color to LDR display space using ACES filmic curve highlight preservation.
-* **How to Enable**: Enable **Glow**, **Auto Exposure**, and set **Tonemap -> Mode** to `ACES` in `WorldEnvironment`.
-
----
-
-## 6. Virtual Geometry & GPU Direct Submission
-
-### Meshlet Cluster Culling
-* **Nanite-Style Cluster Culling**: Decomposes dense mesh geometry into small meshlets with bounding spheres.
-* **GPU Frustum & Backface Culling**: Performs hierarchical bounding sphere frustum and backface culling on compute shaders, discarding occluded geometry before rasterization.
-
-### Multi-Draw Indirect (`ExecuteIndirect`)
-* **Zero CPU Thread Overhead**: Globally caches `ID3D12CommandSignature` objects (`D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED`) to issue multi-draw indirect commands directly on the GPU.
-* **Performance**: Submits thousands of instanced static objects with <0.1ms dispatch time.
+#### Node Properties:
+* `base_altitude`: Cloud layer base height (e.g. `1500m`).
+* `cloud_thickness`: Vertical cloud thickness (e.g. `2500m`).
+* `coverage` ($0.0 - 1.0$): Cloud volume coverage factor.
+* `density` ($0.0 - 5.0$): Optical density and light absorption.
+* `silver_lining_intensity`: Forward-scattering highlight boost around the sun.
+* `wind_direction` & `wind_speed`: Real-time cloud drift velocity.
+* `cast_shadows_on_ground`: Enables real-time terrain cloud shadow projection.
 
 ---
 
-## 7. Hardware Ray Tracing (DXR 1.1) & Global Illumination
+### 3.2 24-Hour Celestial Controller (`TimeOfDay3D`)
+The `TimeOfDay3D` manager node provides a complete 24-hour astronomical day/night cycle:
+* **Astronomical Ephemeris**: Calculates real-time solar declination, hour angle, elevation, and azimuth based on `time_of_day` ($0.0 - 24.0\text{h}$), latitude, and calendar day of the year.
+* **Sun Lighting Synchronization**: Automatically rotates the linked `DirectionalLight3D` along the solar arc and shifts color temperature along a realistic Kelvin blackbody curve (warm 2000K sunrise/sunset $\rightarrow$ crisp 6500K noon).
+* **Moon & Lunar Phases**: Tracks the opposing lunar orbit and drives night ambient illumination.
+* **Celestial Star Dome**: Rotates the starry night sky dome based on planetary orientation.
+* **Signals**: Emits `time_changed(time)`, `hour_passed(hour)`, `day_started`, and `night_started`.
 
-### DXR 1.1 Acceleration Structures & Shader Binding Tables
-* **Hardware DXR Activation**: Queries `ID3D12Device5` for DXR 1.1 support.
-* **Dynamic TLAS Updates**: Rebuilds Top-Level Acceleration Structures (TLAS) dynamically using `D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE` to eliminate GPU memory stalls.
-* **Hardware Dispatch**: Dispatches rays via `ID3D12GraphicsCommandList4::DispatchRays`.
+```gdscript
+extends Node3D
 
-### Real-Time Global Illumination (ZGI)
-* **Dynamic Probe GI (ZGI)**: Real-time probe volume global illumination ([zgi.h](file:///z:/ZeGFX-Engine/ZeGFX/include/zgi.h)). Updates 3D probe grids containing **octahedral-mapped irradiance** and **radial distance fields** via hardware DXR or compute gather passes.
-* **Multi-Bounce Indirect Bounce**: Computes real-time indirect bounce lighting, soft indirect shadows, and ambient color bleeding dynamically.
-* **How to Enable in Editor**:
-  1. Add a **`WorldEnvironment`** node to your scene.
-  2. In the Inspector, enable **SDFGI** or **SSIL**.
-  3. Indirect bounce lighting automatically routes through ZeGFX's **ZGI probe gather pipeline**!
+@onready var tod = $TimeOfDay3D
+
+func _ready():
+    tod.time_of_day = 6.5 # Sunrise
+    tod.time_scale = 60.0 # 1 real second = 1 game minute
+    tod.day_started.connect(_on_day_started)
+
+func _on_day_started():
+    print("Good morning! Sunrise has begun.")
+```
 
 ---
 
-## 8. Feature & Controls Quick Reference
+### 3.3 Dynamic Weather & PBR Surface Wetness (`WeatherController3D`)
+The `WeatherController3D` node manages dynamic weather state machines and environmental surface effects:
+* **Supported Weather States**:
+  * `WEATHER_CLEAR`
+  * `WEATHER_PARTLY_CLOUDY`
+  * `WEATHER_OVERCAST`
+  * `WEATHER_RAIN`
+  * `WEATHER_STORM`
+  * `WEATHER_FOGGY`
+  * `WEATHER_SNOW`
+* **Smooth State Transitions**: Linearly interpolates cloud coverage, density, precipitation intensity, wind gusts, and fog density across configurable durations.
+* **Dynamic PBR Surface Wetness & Puddles**: Drives global shader parameters (`weather_wetness`, `weather_puddle_amount`) in `scene_forward_clustered.glsl`:
+  * Surfaces darken realistically as they absorb water.
+  * Roughness drops, boosting specular reflections.
+  * Puddle accumulation forms reflective water pools in ground crevices.
 
-| Graphics Subsystem | Under-the-Hood Technology | Editor Control Path |
+```gdscript
+extends Node3D
+
+@onready var weather = $WeatherController3D
+
+func trigger_rain_storm():
+    # Transition to Storm over 10 seconds
+    weather.change_weather(WeatherController3D.WEATHER_STORM, 10.0)
+```
+
+---
+
+## 4. Lighting, Shadows & Indirect Global Illumination
+
+### 4.1 128-Tap Vogel Disk PCSS Soft Shadows
+* **Contact-Hardening Penumbra**: Directional shadows calculate blocker distance and filter penumbras using a golden-angle Vogel spiral disk with up to 128 randomized sample taps on Ultra preset.
+* **Logarithmic Split Cascading**: 4-cascade PSSM splits are calculated with logarithmic curvature to distribute shadow map resolution smoothly from close-up character details to distant horizons.
+* **Shadow Atlases**: Up to **8192×8192** shadow maps on Ultra preset.
+
+### 4.2 Screen-Space Contact Shadows (SSCS)
+* Raymarches screen-space depth buffers along light direction vectors to resolve fine geometric contact shadows (under footsteps, pebbles, grass blades, and facial features) where shadow map resolution limits occur.
+
+### 4.3 Horizon-Based GTAO & SSIL
+* **Ground Truth Ambient Occlusion**: Computes screen-space horizon integrals to produce deep, physically grounded contact ambient occlusion without white halo artifacts.
+* **Screen-Space Indirect Lighting (SSIL)**: Full-resolution multi-bounce diffuse light bounce between adjacent geometries.
+
+### 4.4 High-Density 3D Froxel Volumetric Fog
+* Generates a view-space 3D froxel volume ($256\times128$ depth slices on Ultra) with Mie forward-scattering phase functions, direct sun ray injection, and clustered point/spot light scattering for volumetric god rays.
+
+---
+
+## 5. Color, Tonemapping & Post-Processing Suite
+
+### 5.1 ACES Fitted HDR Tonemapping & 3D LUT Color Grading
+* **Stephen Hill / MJP ACES Fitted Curve**: Preserves HDR highlight rolloff, contrast, and gamut mapping without oversaturation or highlight blowout.
+* **3D LUT Grading**: Decoupled 3D Color Correction LUT volume mapping for filmic color grading and stylized aesthetics.
+
+### 5.2 Dual-Filter Bloom with Karis Firefly Suppression
+* Employs a 13-tap Karis luminance-weighted downsampling and 9-tap 3x3 tent upsampling blur pyramid with bicubic upscaling, completely suppressing specular firefly sparkle noise.
+
+### 5.3 Physical Optical Bokeh Depth of Field
+* Circular optical bokeh disc generation with golden-angle randomized jittered sampling (`use_jitter`), eliminating concentric ring banding artifacts in out-of-focus bokeh highlights.
+
+### 5.4 8-Bit & 10-Bit Screen-Space Debanding
+* Applies high-frequency triangular noise dithering with `/ 255.0` (8-bit SDR) and `/ 1023.0` (10-bit HDR) quantization, eliminating banding gradients on skies and shadows.
+
+---
+
+## 6. Anti-Aliasing & Temporal Stability
+
+### 6.1 Subpixel Halton Jitter TAA + Velocity Reprojection
+* **Halton Sequence Subpixel Jitter**: Jitters camera projection matrices across subpixel phases.
+* **9-Tap Catmull-Rom History Resolve**: Filters history buffers using 9-tap bicubic Catmull-Rom interpolation to maintain edge sharpness under camera and object motion.
+* **Dynamic 3x3 Variance Clipping**: Closest-depth velocity dilation and dynamic variance AABB clipping completely eliminate ghosting artifacts behind moving objects.
+
+### 6.2 Native AMD FSR 2.2 Temporal Upscaling
+* Full AMD FidelityFX Super Resolution 2.2 integration supporting Native AA (1.0x display resolution reconstruction) and scaling profiles (1.3x Ultra Quality, 1.5x Quality) with RCAS contrast-adaptive sharpening.
+
+### 6.3 Specular Roughness Limiter (Zero Normal-Map Shimmer)
+* Implements Tokuyoshi & Kaplanyan Geometric Specular AA: calculates screen-space normal derivatives ($dFdx / dFdy$) to adaptively bias GGX microfacet specular roughness on high-frequency normal maps, eliminating specular aliasing fireflies.
+
+---
+
+## 7. Materials & Shading Fidelity
+
+### 7.1 16x Anisotropic Texture Filtering
+* Automatically constructs 16x anisotropic sampler states with negative mipmap LOD bias compensation for all PBR materials, clustered Decals, and light projectors.
+
+### 7.2 Microfacet Multi-Scatter Energy Compensation
+* Implements Filament / Kulla-Conty energy compensation (`1.0 + f0 * (1.0 / max(1e-4, env) - 1.0)`), restoring lost inter-microfacet bounce energy on high-roughness metals and dielectrics.
+
+### 7.3 Jimenez Separable Subsurface Scattering (SSS)
+* Multi-dipole subsurface scattering with 25-sample skin kernels across High and Ultra presets, providing photorealistic skin, wax, and marble translucency with backscatter transmission.
+
+### 7.4 Dual-Lobe Clearcoat & Anisotropic Highlights
+* Secondary clearcoat reflection lobe for car paint and lacquer, paired with flow-map driven anisotropic specular highlights for brushed metals, hair, and carbon fiber.
+
+---
+
+## 8. Landscape, Foliage & World Systems
+
+* **`Terrain3D`**: Native multi-chunk heightmap landscape system with 16-bit linear heightmap loading, continuous CDLOD perimeter skirts (zero-crack seams), triplanar cliff texturing, real-time in-viewport brush sculpting, and synchronized `StaticBody3D` / `HeightMapShape3D` physics collision.
+* **`Grass3D` & `Foliage3D`**: High-density GPU-instanced grass clumps and vegetation with automatic terrain height snapping, distance-based culling, wind flutter, and interactive player trample collision push-back.
+* **`WorldPartition3D`**: Multi-threaded background grid streaming pool for massive open worlds.
+* **`FloatingOrigin3D`**: Automated origin rebasing with 64-bit double precision transform math for jitter-free large-world coordinates.
+
+---
+
+## 9. Feature & Class Quick Reference
+
+| Class / Subsystem | Category | Description |
 | :--- | :--- | :--- |
-| **Direct3D 12 Driver** | Native `ID3D12Device5` & Win32 Swapchain | `Project Settings -> Driver.Windows` |
-| **Dynamic Uploads** | `DX12UploadRingBuffer` (`FRAME_COUNT = 3`) | Automatic |
-| **Shader PSO Cache** | Disk binary serialization (`dx12_psos.bin`) | Automatic |
-| **Clustered Deferred Shading** | 5-Channel MRT G-Buffer + `16x16` Tile Compute | `OmniLight3D` / `SpotLight3D` |
-| **Volumetric Fog & God Rays** | `160x90x128` 3D Texture Froxel Compute | `WorldEnvironment -> Volumetric Fog` |
-| **Shadows & VSM** | 4-Cascade PCF Atlases & Virtual Shadow Maps | `DirectionalLight3D -> Cascades` |
-| **Ambient Occlusion** | Ground Truth Ambient Occlusion (GTAO) | `WorldEnvironment -> SSAO` |
-| **Reflections** | Screen-Space Raymarched Reflections (SSR) | `WorldEnvironment -> SSR` |
-| **Bloom & Tonemapping** | Dual-Filter Mip Pyramid & ACES Filmic | `WorldEnvironment -> Glow / Tonemap` |
-| **Virtual Geometry** | Meshlet Cluster Culling & `ExecuteIndirect` | Automatic |
-| **Hardware Ray Tracing** | DXR 1.1 `DispatchRays` & Acceleration Structs | `WorldEnvironment -> SSR (Metallic)` |
-| **Global Illumination** | ZGI Dynamic Irradiance Probe Volumes | `WorldEnvironment -> SDFGI / SSIL` |
+| **`VolumetricClouds3D`** | Sky & Atmosphere | 3D raymarched volumetric clouds with noise erosion, silver lining & ground shadows. |
+| **`TimeOfDay3D`** | Sky & Atmosphere | 24-hour astronomical celestial cycle controller driving Sun, Moon, and Stars. |
+| **`WeatherController3D`**| Sky & Atmosphere | Dynamic weather state machine with smooth transitions & PBR surface wetness. |
+| **`Terrain3D`** | World & Terrain | Multi-chunk terrain with CDLOD skirts, triplanar texturing, and live sculpting. |
+| **`Grass3D`** | Foliage | Procedural GPU-instanced grass with terrain snapping & player trample physics. |
+| **`Foliage3D`** | Foliage | Scalable chunk-based vegetation and custom tree/rock instancing. |
+| **`WorldPartition3D`** | World Streaming | Asynchronous 2D spatial grid streaming worker pool for open worlds. |
+| **`FloatingOrigin3D`** | World Space | Double-precision large-world coordinate origin rebasing. |
+| **`RenderingServer`** | Rendering API | Controls graphics presets (`GRAPHICS_PRESET_LOW` to `GRAPHICS_PRESET_ULTRA`). |

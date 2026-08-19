@@ -945,6 +945,16 @@ enum Features {
 };
 #endif
 
+/* GRAPHICS PRESET */
+
+enum GraphicsPreset {
+	GRAPHICS_PRESET_LOW,
+	GRAPHICS_PRESET_MEDIUM,
+	GRAPHICS_PRESET_HIGH,
+	GRAPHICS_PRESET_ULTRA,
+	GRAPHICS_PRESET_MAX,
+};
+
 } // namespace RenderingServerEnums
 
 // Alias to make it easier to use.

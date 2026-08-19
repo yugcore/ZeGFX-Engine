@@ -1254,8 +1254,12 @@ void RendererSceneRenderRD::positional_soft_shadow_filter_set_quality(RSE::Shado
 			case RSE::SHADOW_QUALITY_MAX:
 				break;
 		}
-		get_vogel_disk(penumbra_shadow_kernel, penumbra_shadow_samples);
-		get_vogel_disk(soft_shadow_kernel, soft_shadow_samples);
+		if (penumbra_shadow_kernel) {
+			get_vogel_disk(penumbra_shadow_kernel, penumbra_shadow_samples);
+		}
+		if (soft_shadow_kernel) {
+			get_vogel_disk(soft_shadow_kernel, soft_shadow_samples);
+		}
 	}
 
 	_update_shader_quality_settings();
@@ -1301,11 +1305,87 @@ void RendererSceneRenderRD::directional_soft_shadow_filter_set_quality(RSE::Shad
 			case RSE::SHADOW_QUALITY_MAX:
 				break;
 		}
-		get_vogel_disk(directional_penumbra_shadow_kernel, directional_penumbra_shadow_samples);
-		get_vogel_disk(directional_soft_shadow_kernel, directional_soft_shadow_samples);
+		if (directional_penumbra_shadow_kernel) {
+			get_vogel_disk(directional_penumbra_shadow_kernel, directional_penumbra_shadow_samples);
+		}
+		if (directional_soft_shadow_kernel) {
+			get_vogel_disk(directional_soft_shadow_kernel, directional_soft_shadow_samples);
+		}
 	}
 
 	_update_shader_quality_settings();
+}
+
+void RendererSceneRenderRD::graphics_preset_apply(RSE::GraphicsPreset p_preset) {
+	current_graphics_preset = p_preset;
+	switch (p_preset) {
+		case RSE::GRAPHICS_PRESET_LOW: {
+			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_LOW);
+			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_LOW);
+			environment_set_volumetric_fog_volume_size(32, 32);
+			environment_set_volumetric_fog_filter_active(false);
+			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_LOW);
+			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS);
+			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS);
+			material_set_use_debanding(false);
+			screen_space_roughness_limiter_set_active(true, 0.25, 0.18);
+			glow_bicubic_upscale = false;
+			if (RSG::camera_attributes) {
+				RSG::camera_attributes->camera_attributes_set_dof_blur_bokeh_shape(RSE::DOF_BOKEH_CIRCLE);
+				RSG::camera_attributes->camera_attributes_set_dof_blur_quality(RSE::DOF_BLUR_QUALITY_VERY_LOW, false);
+			}
+		} break;
+		case RSE::GRAPHICS_PRESET_MEDIUM: {
+			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_MEDIUM);
+			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_MEDIUM);
+			environment_set_volumetric_fog_volume_size(64, 64);
+			environment_set_volumetric_fog_filter_active(true);
+			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_MEDIUM);
+			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS);
+			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS);
+			material_set_use_debanding(true);
+			screen_space_roughness_limiter_set_active(true, 0.25, 0.18);
+			glow_bicubic_upscale = true;
+			if (RSG::camera_attributes) {
+				RSG::camera_attributes->camera_attributes_set_dof_blur_bokeh_shape(RSE::DOF_BOKEH_CIRCLE);
+				RSG::camera_attributes->camera_attributes_set_dof_blur_quality(RSE::DOF_BLUR_QUALITY_MEDIUM, true);
+			}
+		} break;
+		case RSE::GRAPHICS_PRESET_HIGH: {
+			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_HIGH);
+			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_HIGH);
+			environment_set_volumetric_fog_volume_size(128, 64);
+			environment_set_volumetric_fog_filter_active(true);
+			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_HIGH);
+			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+			material_set_use_debanding(true);
+			screen_space_roughness_limiter_set_active(true, 0.35, 0.22);
+			glow_bicubic_upscale = true;
+			if (RSG::camera_attributes) {
+				RSG::camera_attributes->camera_attributes_set_dof_blur_bokeh_shape(RSE::DOF_BOKEH_CIRCLE);
+				RSG::camera_attributes->camera_attributes_set_dof_blur_quality(RSE::DOF_BLUR_QUALITY_HIGH, true);
+			}
+		} break;
+		case RSE::GRAPHICS_PRESET_ULTRA: {
+			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+			environment_set_volumetric_fog_volume_size(256, 128);
+			environment_set_volumetric_fog_filter_active(true);
+			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_HIGH);
+			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+			material_set_use_debanding(true);
+			screen_space_roughness_limiter_set_active(true, 0.45, 0.25);
+			glow_bicubic_upscale = true;
+			if (RSG::camera_attributes) {
+				RSG::camera_attributes->camera_attributes_set_dof_blur_bokeh_shape(RSE::DOF_BOKEH_CIRCLE);
+				RSG::camera_attributes->camera_attributes_set_dof_blur_quality(RSE::DOF_BLUR_QUALITY_HIGH, true);
+			}
+		} break;
+		default:
+			break;
+	}
 }
 
 void RendererSceneRenderRD::decals_set_filter(RSE::DecalFilter p_filter) {
@@ -1827,6 +1907,10 @@ uint32_t RendererSceneRenderRD::get_max_elements() const {
 
 RendererSceneRenderRD::RendererSceneRenderRD() {
 	singleton = this;
+	directional_penumbra_shadow_kernel = memnew_arr(float, 128);
+	directional_soft_shadow_kernel = memnew_arr(float, 128);
+	penumbra_shadow_kernel = memnew_arr(float, 128);
+	soft_shadow_kernel = memnew_arr(float, 128);
 }
 
 void RendererSceneRenderRD::init() {
@@ -1873,10 +1957,6 @@ void RendererSceneRenderRD::init() {
 	screen_space_roughness_limiter_limit = GLOBAL_GET("rendering/anti_aliasing/screen_space_roughness_limiter/limit");
 	glow_bicubic_upscale = int(GLOBAL_GET("rendering/environment/glow/upscale_mode")) > 0;
 
-	directional_penumbra_shadow_kernel = memnew_arr(float, 128);
-	directional_soft_shadow_kernel = memnew_arr(float, 128);
-	penumbra_shadow_kernel = memnew_arr(float, 128);
-	soft_shadow_kernel = memnew_arr(float, 128);
 	positional_soft_shadow_filter_set_quality(RSE::ShadowQuality(int(GLOBAL_GET("rendering/lights_and_shadows/positional_shadow/soft_shadow_filter_quality"))));
 	directional_soft_shadow_filter_set_quality(RSE::ShadowQuality(int(GLOBAL_GET("rendering/lights_and_shadows/directional_shadow/soft_shadow_filter_quality"))));
 
@@ -1927,6 +2007,9 @@ void RendererSceneRenderRD::init() {
 	mfx_spatial = memnew(RendererRD::MFXSpatialEffect);
 #endif
 	resolve_effects = memnew(RendererRD::Resolve(!can_use_storage));
+
+	int initial_preset = GLOBAL_GET("rendering/quality/preset");
+	graphics_preset_apply(RSE::GraphicsPreset(CLAMP(initial_preset, 0, (int)RSE::GRAPHICS_PRESET_MAX - 1)));
 }
 
 RendererSceneRenderRD::~RendererSceneRenderRD() {

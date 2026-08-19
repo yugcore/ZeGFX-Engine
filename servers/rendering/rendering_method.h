@@ -332,6 +332,8 @@ public:
 
 	virtual void positional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) = 0;
 	virtual void directional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) = 0;
+	virtual void graphics_preset_apply(RSE::GraphicsPreset p_preset) = 0;
+	virtual RSE::GraphicsPreset graphics_preset_get() const = 0;
 
 	/* Render Buffers */
 

@@ -270,6 +270,10 @@ public:
 	virtual void positional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) override;
 	virtual void directional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) override;
 
+	RSE::GraphicsPreset current_graphics_preset = RSE::GRAPHICS_PRESET_HIGH;
+	virtual void graphics_preset_apply(RSE::GraphicsPreset p_preset) override;
+	virtual RSE::GraphicsPreset graphics_preset_get() const override { return current_graphics_preset; }
+
 	virtual void decals_set_filter(RSE::DecalFilter p_filter) override;
 	virtual void light_projectors_set_filter(RSE::LightProjectorFilter p_filter) override;
 	virtual void lightmaps_set_bicubic_filter(bool p_enable) override;

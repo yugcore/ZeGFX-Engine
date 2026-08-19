@@ -61,7 +61,8 @@ layout(set = 3, binding = 0) uniform sampler3D source_color_correction;
 #define FLAG_USE_COLOR_CORRECTION (1 << 3)
 #define FLAG_USE_FXAA (1 << 4)
 #define FLAG_USE_8_BIT_DEBANDING (1 << 5)
-#define FLAG_CONVERT_TO_SRGB (1 << 6)
+#define FLAG_USE_10_BIT_DEBANDING (1 << 6)
+#define FLAG_CONVERT_TO_SRGB (1 << 7)
 
 layout(push_constant, std430) uniform Params {
 	vec3 bcs;
@@ -908,32 +909,36 @@ void main() {
 
 	// Additional effects.
 
-	if (bool(params.flags & FLAG_USE_BCS)) {
-		// Apply brightness:
-		// Apply to relative luminance. This ensures that the hue and saturation of
-		// colors is not affected by the adjustment, but requires the multiplication
-		// to be performed on linear-encoded values.
-		color.rgb = color.rgb * params.bcs.x;
+	if (bool(params.flags & FLAG_USE_BCS) || bool(params.flags & FLAG_USE_COLOR_CORRECTION)) {
+		if (bool(params.flags & FLAG_USE_BCS)) {
+			// Apply brightness:
+			// Apply to relative luminance. This ensures that the hue and saturation of
+			// colors is not affected by the adjustment, but requires the multiplication
+			// to be performed on linear-encoded values.
+			color.rgb = color.rgb * params.bcs.x;
 
-		color.rgb = linear_to_srgb(color.rgb);
+			color.rgb = linear_to_srgb(color.rgb);
 
-		// Apply contrast:
-		// By applying contrast to RGB values that are perceptually uniform (nonlinear),
-		// the darkest values are not hard-clipped as badly, which produces a
-		// higher quality contrast adjustment and maintains compatibility with
-		// existing projects.
-		color.rgb = mix(vec3(0.5), color.rgb, params.bcs.y);
+			// Apply contrast:
+			// By applying contrast to RGB values that are perceptually uniform (nonlinear),
+			// the darkest values are not hard-clipped as badly, which produces a
+			// higher quality contrast adjustment and maintains compatibility with
+			// existing projects.
+			color.rgb = mix(vec3(0.5), color.rgb, params.bcs.y);
 
-		// Apply saturation:
-		// By applying saturation adjustment to nonlinear sRGB-encoded values with
-		// even weights the preceived brightness of blues are affected, but this
-		// maintains compatibility with existing projects.
-		color.rgb = mix(vec3(dot(vec3(1.0), color.rgb) * (1.0 / 3.0)), color.rgb, params.bcs.z);
+			// Apply saturation:
+			// By applying saturation adjustment to nonlinear sRGB-encoded values with
+			// even weights the preceived brightness of blues are affected, but this
+			// maintains compatibility with existing projects.
+			color.rgb = mix(vec3(dot(vec3(1.0), color.rgb) * (1.0 / 3.0)), color.rgb, params.bcs.z);
+		} else {
+			color.rgb = linear_to_srgb(color.rgb);
+		}
 
 		if (bool(params.flags & FLAG_USE_COLOR_CORRECTION)) {
 			color.rgb = clamp(color.rgb, vec3(0.0), vec3(1.0));
 			color.rgb = apply_color_correction(color.rgb);
-			// When using color correction and  FLAG_CONVERT_TO_SRGB is false, there
+			// When using color correction and FLAG_CONVERT_TO_SRGB is false, there
 			// is no need to convert back to linear because the color correction
 			// texture sampling does this for us.
 		} else if (!bool(params.flags & FLAG_CONVERT_TO_SRGB)) {
@@ -949,6 +954,9 @@ void main() {
 	if (bool(params.flags & FLAG_USE_8_BIT_DEBANDING)) {
 		// Divide by 255 to align to 8-bit quantization.
 		color.rgb += screen_space_dither(gl_FragCoord.xy, 255.0);
+	} else if (bool(params.flags & FLAG_USE_10_BIT_DEBANDING)) {
+		// Divide by 1023 to align to 10-bit quantization.
+		color.rgb += screen_space_dither(gl_FragCoord.xy, 1023.0);
 	}
 
 	frag_color = color;

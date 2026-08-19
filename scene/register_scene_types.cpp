@@ -265,6 +265,9 @@
 #include "scene/3d/foliage_type_3d.h"
 #include "scene/3d/foliage_3d.h"
 #include "scene/3d/world_partition_3d.h"
+#include "scene/3d/volumetric_clouds_3d.h"
+#include "scene/3d/time_of_day_3d.h"
+#include "scene/3d/weather_controller_3d.h"
 #include "scene/3d/reflection_probe.h"
 #include "scene/3d/remote_transform_3d.h"
 #include "scene/3d/retarget_modifier_3d.h"
@@ -665,6 +668,9 @@ void register_scene_types() {
 	GDREGISTER_CLASS(Foliage3D);
 	GDREGISTER_CLASS(WorldPartition3D);
 	GDREGISTER_CLASS(FloatingOrigin3D);
+	GDREGISTER_CLASS(VolumetricClouds3D);
+	GDREGISTER_CLASS(TimeOfDay3D);
+	GDREGISTER_CLASS(WeatherController3D);
 #ifndef DISABLE_DEPRECATED
 	MeshInstance3D::use_parent_skeleton_compat = GLOBAL_GET("animation/compatibility/default_parent_skeleton_in_mesh_instance_3d");
 #endif

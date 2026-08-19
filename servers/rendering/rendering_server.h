@@ -348,6 +348,9 @@ public:
 	virtual void positional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) = 0;
 	virtual void directional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) = 0;
 
+	virtual void graphics_preset_apply(RSE::GraphicsPreset p_preset) = 0;
+	virtual RSE::GraphicsPreset graphics_preset_get() const = 0;
+
 	virtual void light_projectors_set_filter(RSE::LightProjectorFilter p_filter) = 0;
 
 	/* REFLECTION PROBE API */
@@ -1171,6 +1174,7 @@ VARIANT_ENUM_CAST_EXT(RSE::RenderingInfo, RenderingServer::RenderingInfo);
 VARIANT_ENUM_CAST_EXT(RSE::SplashStretchMode, RenderingServer::SplashStretchMode);
 VARIANT_ENUM_CAST_EXT(RSE::CanvasTextureChannel, RenderingServer::CanvasTextureChannel);
 VARIANT_ENUM_CAST_EXT(RSE::BakeChannels, RenderingServer::BakeChannels);
+VARIANT_ENUM_CAST_EXT(RSE::GraphicsPreset, RenderingServer::GraphicsPreset);
 
 #ifndef DISABLE_DEPRECATED
 VARIANT_ENUM_CAST_EXT(RSE::Features, RenderingServer::Features);

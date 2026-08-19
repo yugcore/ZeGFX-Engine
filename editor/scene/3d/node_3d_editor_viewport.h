@@ -171,6 +171,10 @@ class Node3DEditorViewport : public Control {
 		VIEW_GRID,
 		VIEW_INFORMATION,
 		VIEW_FRAME_TIME,
+		VIEW_QUALITY_LOW,
+		VIEW_QUALITY_MEDIUM,
+		VIEW_QUALITY_HIGH,
+		VIEW_QUALITY_ULTRA,
 
 		// < Keep in sync with menu.
 		VIEW_DISPLAY_NORMAL,
@@ -366,6 +370,7 @@ private:
 	bool movement_threshold_passed = false;
 
 	PopupMenu *selection_menu = nullptr;
+	PopupMenu *quality_submenu = nullptr;
 
 	enum TransformMode {
 		TRANSFORM_NONE,

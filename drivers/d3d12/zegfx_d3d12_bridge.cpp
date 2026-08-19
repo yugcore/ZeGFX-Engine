@@ -11,6 +11,9 @@
 #include "zpost_process.h"
 #include "cooker/asset_cooker.h"
 
+#include <algorithm>
+#include <cmath>
+
 // Forward-declared ZeGFX classes are defined in their own .cpp translation units
 // (compiled via SCsub wildcards). We use opaque pointers + settings structs only.
 // DO NOT #include the .cpp files here — that causes ODR violations and vtable corruption.
@@ -121,17 +124,12 @@ bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, 
 		return false;
 	}
 	r_splits.clear();
-<<<<<<< HEAD
-	float lambda = 0.85f; // High-density near-cascade distribution
-=======
-
 	// Guard against non-positive near clip (e.g. orthogonal projections or near=0) to prevent NaN/Div0
 	float safe_near = std::max(0.05f, p_near_clip);
 	float safe_far = std::max(safe_near + 1.0f, p_far_clip);
 
 	// Balanced log-linear split parameter (0.55 provides sharp near-detail without starving mid/far cascades)
 	float lambda = 0.55f;
->>>>>>> 62cb79ed41 (First/Third Person Node Implemented V2)
 	for (uint32_t i = 1; i < p_cascade_count; i++) {
 		float fi = static_cast<float>(i) / static_cast<float>(p_cascade_count);
 		float log_split = safe_near * std::pow(safe_far / safe_near, fi);

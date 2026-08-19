@@ -1379,6 +1379,8 @@ public:
 
 	PASS1(positional_soft_shadow_filter_set_quality, RSE::ShadowQuality)
 	PASS1(directional_soft_shadow_filter_set_quality, RSE::ShadowQuality)
+	PASS1(graphics_preset_apply, RSE::GraphicsPreset)
+	PASS0RC(RSE::GraphicsPreset, graphics_preset_get)
 
 	PASS2(sdfgi_set_debug_probe_select, const Vector3 &, const Vector3 &)
 

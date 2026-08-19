@@ -2604,6 +2604,15 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("directional_soft_shadow_filter_set_quality", "quality"), &RenderingServer::directional_soft_shadow_filter_set_quality);
 	ClassDB::bind_method(D_METHOD("directional_shadow_atlas_set_size", "size", "is_16bits"), &RenderingServer::directional_shadow_atlas_set_size);
 
+	ClassDB::bind_method(D_METHOD("graphics_preset_apply", "preset"), &RenderingServer::graphics_preset_apply);
+	ClassDB::bind_method(D_METHOD("graphics_preset_get"), &RenderingServer::graphics_preset_get);
+
+	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_LOW);
+	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_MEDIUM);
+	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_HIGH);
+	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_ULTRA);
+	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_MAX);
+
 	BIND_ENUM_CONSTANT(RSE::SHADOW_QUALITY_HARD);
 	BIND_ENUM_CONSTANT(RSE::SHADOW_QUALITY_SOFT_VERY_LOW);
 	BIND_ENUM_CONSTANT(RSE::SHADOW_QUALITY_SOFT_LOW);
@@ -3676,6 +3685,7 @@ void RenderingServer::init() {
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/limits/time/time_rollover_secs", PROPERTY_HINT_RANGE, "1,10000,1,or_greater,suffix:s"), 3600);
 
 	GLOBAL_DEF_RST("rendering/lights_and_shadows/use_physical_light_units", false);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/quality/preset", PROPERTY_HINT_ENUM, "Low,Medium,High,Ultra"), 2);
 
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/directional_shadow/size", PROPERTY_HINT_RANGE, "256,16384"), 4096);
 	GLOBAL_DEF("rendering/lights_and_shadows/directional_shadow/size.mobile", 2048);

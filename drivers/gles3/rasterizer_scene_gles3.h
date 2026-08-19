@@ -935,6 +935,32 @@ public:
 	void positional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) override;
 	void directional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) override;
 
+	RSE::GraphicsPreset current_graphics_preset = RSE::GRAPHICS_PRESET_HIGH;
+	void graphics_preset_apply(RSE::GraphicsPreset p_preset) override {
+		current_graphics_preset = p_preset;
+		switch (p_preset) {
+			case RSE::GRAPHICS_PRESET_LOW:
+				positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_LOW);
+				directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_LOW);
+				break;
+			case RSE::GRAPHICS_PRESET_MEDIUM:
+				positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_MEDIUM);
+				directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_MEDIUM);
+				break;
+			case RSE::GRAPHICS_PRESET_HIGH:
+				positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_HIGH);
+				directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_HIGH);
+				break;
+			case RSE::GRAPHICS_PRESET_ULTRA:
+				positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+				directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+				break;
+			default:
+				break;
+		}
+	}
+	RSE::GraphicsPreset graphics_preset_get() const override { return current_graphics_preset; }
+
 	RID fog_volume_instance_create(RID p_fog_volume) override;
 	void fog_volume_instance_set_transform(RID p_fog_volume_instance, const Transform3D &p_transform) override;
 	void fog_volume_instance_set_active(RID p_fog_volume_instance, bool p_active) override;

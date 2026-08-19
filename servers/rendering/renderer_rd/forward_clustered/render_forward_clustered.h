@@ -797,6 +797,8 @@ protected:
 	virtual void sub_surface_scattering_set_quality(RSE::SubSurfaceScatteringQuality p_quality) override;
 	virtual void sub_surface_scattering_set_scale(float p_scale, float p_depth_scale) override;
 
+	virtual void graphics_preset_apply(RSE::GraphicsPreset p_preset) override;
+
 	/* Rendering */
 
 	virtual void _render_scene(RenderDataRD *p_render_data, const Color &p_default_bg_color) override;

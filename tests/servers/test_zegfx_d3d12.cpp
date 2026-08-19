@@ -5,6 +5,8 @@
 #include "tests/servers/test_zegfx_d3d12.h"
 #include "tests/test_macros.h"
 
+TEST_FORCE_LINK(test_zegfx_d3d12)
+
 #ifdef WITH_DX12_BACKEND
 #include "drivers/d3d12/zegfx_d3d12_bridge.h"
 #include "drivers/d3d12/d3d12_pipeline_state_manager.h"
@@ -16,6 +18,7 @@
 
 namespace TestZeGFXD3D12 {
 
+#ifdef WITH_DX12_BACKEND
 TEST_CASE("[ZeGFX][D3D12] Render Graph DAG Builder and Resource Barriers") {
     zegfx::RenderGraph graph;
     SUBCASE("Check physical resource registration") {
@@ -25,6 +28,7 @@ TEST_CASE("[ZeGFX][D3D12] Render Graph DAG Builder and Resource Barriers") {
         CHECK(graph.getResource(id).name == "TestBuffer");
     }
 }
+#endif
 
 TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
 #ifdef WITH_DX12_BACKEND

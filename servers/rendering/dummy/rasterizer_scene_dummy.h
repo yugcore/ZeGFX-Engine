@@ -146,6 +146,8 @@ public:
 
 	void positional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) override {}
 	void directional_soft_shadow_filter_set_quality(RSE::ShadowQuality p_quality) override {}
+	void graphics_preset_apply(RSE::GraphicsPreset p_preset) override {}
+	RSE::GraphicsPreset graphics_preset_get() const override { return RSE::GRAPHICS_PRESET_HIGH; }
 
 	RID fog_volume_instance_create(RID p_fog_volume) override { return RID(); }
 	void fog_volume_instance_set_transform(RID p_fog_volume_instance, const Transform3D &p_transform) override {}

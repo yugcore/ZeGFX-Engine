@@ -2978,7 +2978,7 @@ void Node3DEditor::_preview_settings_changed() {
 		environment->set_ssao_enabled(environ_ao_button->is_pressed());
 		environment->set_glow_enabled(environ_glow_button->is_pressed());
 		environment->set_sdfgi_enabled(environ_gi_button->is_pressed());
-		environment->set_tonemapper(environ_tonemap_button->is_pressed() ? Environment::TONE_MAPPER_FILMIC : Environment::TONE_MAPPER_LINEAR);
+		environment->set_tonemapper(environ_tonemap_button->is_pressed() ? Environment::TONE_MAPPER_ACES : Environment::TONE_MAPPER_LINEAR);
 	}
 }
 
@@ -3001,9 +3001,12 @@ void Node3DEditor::_load_default_preview_settings() {
 	environ_energy->set_value_no_signal(1.0);
 	if (OS::get_singleton()->get_current_rendering_method() != "gl_compatibility" && OS::get_singleton()->get_current_rendering_method() != "dummy") {
 		environ_glow_button->set_pressed_no_signal(true);
+		environ_ao_button->set_pressed_no_signal(true);
+		environ_tonemap_button->set_pressed_no_signal(true);
+	} else {
+		environ_tonemap_button->set_pressed_no_signal(false);
+		environ_ao_button->set_pressed_no_signal(false);
 	}
-	environ_tonemap_button->set_pressed_no_signal(false);
-	environ_ao_button->set_pressed_no_signal(false);
 	environ_gi_button->set_pressed_no_signal(false);
 	sun_shadow_max_distance->set_value_no_signal(100);
 

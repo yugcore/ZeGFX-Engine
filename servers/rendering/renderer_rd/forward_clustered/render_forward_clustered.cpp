@@ -4075,6 +4075,51 @@ void RenderForwardClustered::sub_surface_scattering_set_scale(float p_scale, flo
 	ss_effects->sss_set_scale(p_scale, p_depth_scale);
 }
 
+void RenderForwardClustered::graphics_preset_apply(RSE::GraphicsPreset p_preset) {
+	RendererSceneRenderRD::graphics_preset_apply(p_preset);
+
+	if (!ss_effects) {
+		return;
+	}
+
+	switch (p_preset) {
+		case RSE::GRAPHICS_PRESET_LOW: {
+			ss_effects->ssao_set_quality(RSE::ENV_SSAO_QUALITY_VERY_LOW, true, 0.5f, 1, 50.0f, 300.0f);
+			ss_effects->ssil_set_quality(RSE::ENV_SSIL_QUALITY_VERY_LOW, true, 0.5f, 1, 50.0f, 300.0f);
+			ss_effects->ssr_set_half_size(true);
+			gi.voxel_gi_quality = RSE::VOXEL_GI_QUALITY_LOW;
+			environment_set_sdfgi_ray_count(RSE::ENV_SDFGI_RAY_COUNT_8);
+			environment_set_sdfgi_frames_to_converge(RSE::ENV_SDFGI_CONVERGE_IN_5_FRAMES);
+		} break;
+		case RSE::GRAPHICS_PRESET_MEDIUM: {
+			ss_effects->ssao_set_quality(RSE::ENV_SSAO_QUALITY_MEDIUM, true, 0.5f, 2, 50.0f, 300.0f);
+			ss_effects->ssil_set_quality(RSE::ENV_SSIL_QUALITY_MEDIUM, true, 0.5f, 2, 50.0f, 300.0f);
+			ss_effects->ssr_set_half_size(true);
+			gi.voxel_gi_quality = RSE::VOXEL_GI_QUALITY_LOW;
+			environment_set_sdfgi_ray_count(RSE::ENV_SDFGI_RAY_COUNT_16);
+			environment_set_sdfgi_frames_to_converge(RSE::ENV_SDFGI_CONVERGE_IN_10_FRAMES);
+		} break;
+		case RSE::GRAPHICS_PRESET_HIGH: {
+			ss_effects->ssao_set_quality(RSE::ENV_SSAO_QUALITY_HIGH, false, 0.5f, 3, 50.0f, 300.0f);
+			ss_effects->ssil_set_quality(RSE::ENV_SSIL_QUALITY_HIGH, false, 0.5f, 3, 50.0f, 300.0f);
+			ss_effects->ssr_set_half_size(false);
+			gi.voxel_gi_quality = RSE::VOXEL_GI_QUALITY_HIGH;
+			environment_set_sdfgi_ray_count(RSE::ENV_SDFGI_RAY_COUNT_64);
+			environment_set_sdfgi_frames_to_converge(RSE::ENV_SDFGI_CONVERGE_IN_20_FRAMES);
+		} break;
+		case RSE::GRAPHICS_PRESET_ULTRA: {
+			ss_effects->ssao_set_quality(RSE::ENV_SSAO_QUALITY_ULTRA, false, 0.5f, 4, 50.0f, 300.0f);
+			ss_effects->ssil_set_quality(RSE::ENV_SSIL_QUALITY_ULTRA, false, 0.5f, 4, 50.0f, 300.0f);
+			ss_effects->ssr_set_half_size(false);
+			gi.voxel_gi_quality = RSE::VOXEL_GI_QUALITY_HIGH;
+			environment_set_sdfgi_ray_count(RSE::ENV_SDFGI_RAY_COUNT_128);
+			environment_set_sdfgi_frames_to_converge(RSE::ENV_SDFGI_CONVERGE_IN_30_FRAMES);
+		} break;
+		default:
+			break;
+	}
+}
+
 RenderForwardClustered *RenderForwardClustered::singleton = nullptr;
 
 void RenderForwardClustered::sdfgi_update(const Ref<RenderSceneBuffers> &p_render_buffers, RID p_environment, const Vector3 &p_world_position) {
