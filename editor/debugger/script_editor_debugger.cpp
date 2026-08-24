@@ -2517,9 +2517,6 @@ Instead, use the monitors tab to obtain more precise VRAM usage.
 		misc->add_child(buttons);
 	}
 
-	msgdialog = memnew(AcceptDialog);
-	add_child(msgdialog);
-
 	_update_buttons_state();
 }
 
