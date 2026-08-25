@@ -1,2 +1,9 @@
 e408e18b4734ecdc82004cc1afc2c48f
-::res://::1786940816
+::res://::1787640872
+capture_shadow.gd::GDScript::5130230533834744249::1787639765::0::1::::<>SceneTree<><>0<>0<><>::
+shadow_after_fix.png::CompressedTexture2D::5642536030649489582::1787639865::1787640899::1::::<><><>0<>0<>a65359b7a81fc59a6e25ea10dd85114a<>res://.godot/imported/shadow_after_fix.png-096e2279e202764b6785ff2523b289b1.ctex::
+shadow_before_fix.png::CompressedTexture2D::4353315099641553085::1787639785::1787640899::1::::<><><>0<>0<>2d006e13d7377df58f1547ece1cbd9ee<>res://.godot/imported/shadow_before_fix.png-2de56f7aa070c0e87f2ad823f61f4e4d.ctex::
+shadow_render.png::CompressedTexture2D::3034672862562287227::1787639865::1787640899::1::::<><><>0<>0<>cb1730efdbe83293aaae8161bcf5e628<>res://.godot/imported/shadow_render.png-b8dec2ebdb79707a809a65b1ec5796ea.ctex::
+test_character_controller.gd::GDScript::7658463612438203989::1787103545::0::1::::<>MainLoop<><>0<>0<><>::
+test_heightmap_16bit.r16::Image::2936996991676507549::1787640867::1787640899::1::::<><><>0<>0<>45a4ead4c91b74af26327179ab77024d<>res://.godot/imported/test_heightmap_16bit.r16-d5b55a0ac25eb10f1d4a04216e57740f.image::
+test_heightmap_precision.gd::GDScript::1980595931012302217::1787640872::0::1::::<>SceneTree<><>0<>0<><>::
