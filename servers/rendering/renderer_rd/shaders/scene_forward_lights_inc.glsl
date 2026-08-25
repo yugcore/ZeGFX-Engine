@@ -140,7 +140,10 @@ void light_compute(hvec3 N, hvec3 L, hvec3 V, half A, hvec3 light_color, bool is
 			instances.data[instance_index].transform[2],
 			vec4(0.0, 0.0, 0.0, 1.0)));
 
-
+#undef projection_matrix
+#define projection_matrix scene_data_block.data.projection_matrix
+#undef inv_projection_matrix
+#define inv_projection_matrix scene_data_block.data.inv_projection_matrix
 
 	vec2 read_viewport_size = scene_data_block.data.viewport_size;
 
@@ -332,53 +335,6 @@ half sample_directional_pcf_shadow(texture2D shadow, vec2 shadow_pixel_size, vec
 
 	return half(avg * (1.0 / float(sc_directional_soft_shadow_samples())));
 }
-
-#undef projection_matrix
-// Screen-Space Contact Shadows (SSCS) — 16-step view-space raymarch
-// Marches rays through depth along the light direction to recover fine micro-shadows
-// (crevices, feet contact, pebbles, architectural details)
-half calculate_screen_space_contact_shadow(vec3 p_view_pos, vec3 p_view_light_dir, float p_max_distance, float p_taa_frame_count) {
-	const int NUM_STEPS = 16;
-	float step_len = p_max_distance / float(NUM_STEPS);
-
-	// Temporal / sub-pixel jitter to prevent banding artifacts
-	float jitter = quick_hash(gl_FragCoord.xy + vec2(p_taa_frame_count * 5.588238));
-	vec3 ray_dir = normalize(p_view_light_dir);
-	vec3 ray_pos = p_view_pos + ray_dir * (step_len * (jitter * 0.5 + 0.5));
-	vec3 ray_step = ray_dir * step_len;
-
-	float shadow_accum = 1.0;
-
-	for (int s = 0; s < NUM_STEPS; s++) {
-		// Project ray view position to NDC space
-#if defined(USE_MULTIVIEW)
-		vec4 proj = scene_data_block.data.projection_matrix_view[ViewIndex] * vec4(ray_pos, 1.0);
-#else
-		vec4 proj = scene_data_block.data.projection_matrix * vec4(ray_pos, 1.0);
-#endif
-		if (proj.w <= 0.0) {
-			break;
-		}
-		vec2 sample_uv = (proj.xy / proj.w) * 0.5 + 0.5;
-
-		if (sample_uv.x < 0.0 || sample_uv.x > 1.0 || sample_uv.y < 0.0 || sample_uv.y > 1.0) {
-			break;
-		}
-
-		float step_weight = 1.0 - (float(s) / float(NUM_STEPS));
-		// High-contrast physically grounded contact shadow falloff
-		shadow_accum = min(shadow_accum, 1.0 - step_weight * 0.65);
-
-		ray_pos += ray_step;
-	}
-
-	return half(clamp(shadow_accum, 0.0, 1.0));
-}
-#if defined(USE_MULTIVIEW)
-#define projection_matrix scene_data.projection_matrix_view[ViewIndex]
-#else
-#define projection_matrix scene_data.projection_matrix
-#endif
 
 half sample_pcf_shadow(texture2D shadow, vec2 shadow_pixel_size, vec3 coord, float taa_frame_count) {
 	vec2 pos = coord.xy;
@@ -670,12 +626,6 @@ void light_process_omni(uint idx, vec3 vertex, hvec3 eye_vec, hvec3 normal, vec3
 			depth = 1.0 - depth;
 			shadow = mix(half(1.0), sample_omni_pcf_shadow(shadow_atlas, omni_lights.data[idx].soft_shadow_scale / shadow_sample.z, pos, uv_rect, flip_offset, depth, taa_frame_count), half(omni_lights.data[idx].shadow_opacity));
 		}
-
-		// Screen-Space Contact Shadows (SSCS) for omni lights
-		if (shadow > half(0.001)) {
-			half contact_shadow = calculate_screen_space_contact_shadow(vertex, light_rel_vec, 0.25, taa_frame_count);
-			shadow *= contact_shadow;
-		}
 	}
 #endif
 
@@ -929,12 +879,6 @@ void light_process_spot(uint idx, vec3 vertex, hvec3 eye_vec, hvec3 normal, vec3
 			//hard shadow
 			vec3 shadow_uv = vec3(splane.xy * spot_lights.data[idx].atlas_rect.zw + spot_lights.data[idx].atlas_rect.xy, splane.z);
 			shadow = mix(half(1.0), sample_pcf_shadow(shadow_atlas, spot_lights.data[idx].soft_shadow_scale * scene_data_block.data.shadow_atlas_pixel_size, shadow_uv, taa_frame_count), half(spot_lights.data[idx].shadow_opacity));
-		}
-
-		// Screen-Space Contact Shadows (SSCS) for spot lights
-		if (shadow > half(0.001)) {
-			half contact_shadow = calculate_screen_space_contact_shadow(vertex, light_rel_vec, 0.25, taa_frame_count);
-			shadow *= contact_shadow;
 		}
 	}
 #endif // SHADOWS_DISABLED
@@ -1228,7 +1172,10 @@ void light_process_area(uint idx, vec3 vertex, hvec3 eye_vec, hvec3 normal, vec3
 			instances.data[instance_index].transform[2],
 			vec4(0.0, 0.0, 0.0, 1.0)));
 
-
+#undef projection_matrix
+#define projection_matrix scene_data_block.data.projection_matrix
+#undef inv_projection_matrix
+#define inv_projection_matrix scene_data_block.data.inv_projection_matrix
 
 	vec2 read_viewport_size = scene_data_block.data.viewport_size;
 

@@ -2534,12 +2534,6 @@ void fragment_shader(in SceneData scene_data) {
 					}
 #endif
 
-					// Screen-Space Contact Shadows (SSCS) for fine contact hardening
-					if (shadow > 0.001) {
-						half contact_shadow = calculate_screen_space_contact_shadow(vertex, -directional_lights.data[i].direction, 0.35, scene_data.taa_frame_count);
-						shadow *= float(contact_shadow);
-					}
-
 #ifdef USE_VERTEX_LIGHTING
 					diffuse_light *= mix(1.0, shadow, diffuse_light_interp.a);
 					direct_specular_light *= mix(1.0, shadow, specular_light_interp.a);
