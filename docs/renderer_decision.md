@@ -12,15 +12,19 @@ The project will pursue **Path 3A (Activate the Real DX12/ZeGFX Pipeline)**. Rat
 
 This decision commits the project to a sequential, phased engineering effort:
 
-1. **Live Command List Extraction & Resource Barrier Synchronization**:
-   - Extract and pass live `ID3D12GraphicsCommandList` instances from `RenderingDeviceDriverD3D12` / `RenderingDevice` into `ZeGFXD3D12Bridge::flush_deferred_passes()` instead of `nullptr`.
-   - Ensure proper D3D12 resource state transitions between Godot RD passes and ZeGFX compute/graphics passes.
+1. **Phase 3A.1 (Completed): Live Command List Extraction & Camera Matrix Binding**:
+   - Extracted and passed live `ID3D12GraphicsCommandList` instances from `RenderingDeviceDriverD3D12` into `ZeGFXD3D12Bridge::flush_deferred_passes()`.
+   - Bound active camera view, projection, inverse matrices, and frustum planes to `zegfx::LightGridManager::SetCameraMatrices()`.
 
-2. **Deferred Pass Execution & Camera Matrix Binding**:
-   - Implement `RendererSceneD3D12::render_scene_deferred()` to bind live camera view, projection, and inverse matrices from active render views rather than hardcoded identity values.
+2. **Phase 5 (Next): Live G-Buffer & GPU Resource Barrier Synchronization (Geometry & Barriers Alone)**:
+   - Transition scene mesh geometry draw call recording to the live D3D12 command list in `RendererSceneD3D12`.
+   - Implement explicit `CD3DX12_RESOURCE_BARRIER` state transitions between Godot RD render passes and ZeGFX compute passes.
+   - Ship and re-audit Phase 5 in complete isolation before touching ray tracing.
 
-3. **DXR 1.1 Acceleration Structure & Root Signature Binding**:
-   - Resolve descriptor table slot bindings 1 & 2 in `DXRPipelineD3D12::dispatch_reflection_rays()` only after command list execution and GPU barrier transitions are live and stable.
+3. **Phase 6 (Subsequent): Hardware DXR 1.1 Reflection Dispatch & Descriptor Table Binding**:
+   - Build live Top-Level Acceleration Structures (TLAS) from active scene instances.
+   - Resolve descriptor table slot bindings 1 (TLAS SRV) & 2 (Output UAV) in `DXRPipelineD3D12::dispatch_reflection_rays()`.
+   - Enable hardware ray dispatch strictly as its own isolated phase after Phase 5 geometry and barriers are verified crash-free.
 
 4. **Multi-Backend Fallback Safety**:
    - All ZeGFX D3D12 bridge calls remain strictly guarded behind `#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)`, ensuring non-Windows platforms (Linux, macOS, Mobile) and Vulkan/GLES3 builds continue to function without disruption.

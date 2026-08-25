@@ -115,7 +115,7 @@ void ZeGFXD3D12Bridge::shutdown() {
 }
 
 bool ZeGFXD3D12Bridge::dxr_reflections_active() const {
-	return initialized && dxr_pipeline && dxr_pipeline->is_dxr_supported();
+	return initialized && dxr_pipeline && dxr_pipeline->is_pipeline_ready();
 }
 
 // --- Phase 1: Shadow pass — computes ZeGFX Log-Linear PSSM splits & contact hardening distribution ---
@@ -386,8 +386,8 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		}
 	}
 
-	// Execute DXR ray-traced reflections when scheduled and hardware is available
-	if (pending_dxr_reflections.dirty && dxr_pipeline && dxr_pipeline->is_dxr_supported() && p_cmd_list) {
+	// Execute DXR ray-traced reflections when scheduled and hardware pipeline is fully ready
+	if (pending_dxr_reflections.dirty && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && p_cmd_list) {
 		dxr_pipeline->dispatch_reflection_rays(
 				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
 				static_cast<ID3D12Resource *>(p_hdr_target),
@@ -395,6 +395,8 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 				static_cast<ID3D12Resource *>(p_normal_target),
 				p_width, p_height, pending_dxr_reflections.roughness);
 		dxr_reflections_succeeded = true;
+	} else {
+		dxr_reflections_succeeded = false;
 	}
 
 	// Execute the post-processing chain with the targets (when available)

@@ -492,10 +492,14 @@ void DXRPipelineD3D12::dispatch_reflection_rays(
 
         cmd_list4->SetComputeRoot32BitConstants(0, sizeof(DXRReflectionConstants) / 4, &constants, 0);
 
+        // Note: Root parameter 1 (TLAS SRV) and Parameter 2 (Output UAV) descriptor table bindings
+        // are sequenced for Phase 6. Only dispatch rays once TLAS SRV and UAV descriptors are live.
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
         dispatch_desc.Width = static_cast<UINT>(p_width);
         dispatch_desc.Height = static_cast<UINT>(p_height);
         dispatch_desc.Depth = 1;
         cmd_list4->DispatchRays(&dispatch_desc);
+#endif
     }
 
     cmd_list4->Release();
