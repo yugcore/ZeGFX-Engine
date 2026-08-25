@@ -498,7 +498,9 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 		void *normal_native = nullptr;
 		void *output_native = nullptr;
 
+		void *native_cmd_list = nullptr;
 		if (RD::get_singleton()) {
+			native_cmd_list = (void *)RD::get_singleton()->get_driver_resource(RD::DRIVER_RESOURCE_COMMAND_LIST);
 			if (color_texture.is_valid()) {
 				hdr_native = (void *)RD::get_singleton()->get_driver_resource(RD::DRIVER_RESOURCE_TEXTURE, color_texture);
 			}
@@ -513,7 +515,7 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 
 		// Flush all deferred ZeGFX render graph passes now that settings are finalized.
 		ZeGFXD3D12Bridge::get_singleton()->flush_deferred_passes(
-				nullptr /*cmd_list*/, hdr_native, depth_native,
+				native_cmd_list, hdr_native, depth_native,
 				normal_native, output_native,
 				target_size.x, target_size.y, 0.016f /*delta_time ~60fps*/);
 	}

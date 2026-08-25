@@ -8810,6 +8810,9 @@ uint64_t RenderingDevice::get_driver_resource(DriverResource p_resource, RID p_r
 
 			driver_id = render_pipeline->driver_id.id;
 		} break;
+		case DRIVER_RESOURCE_COMMAND_LIST: {
+			driver_id = frames[frame].command_buffer.id;
+		} break;
 		default: {
 			ERR_FAIL_V(0);
 		} break;

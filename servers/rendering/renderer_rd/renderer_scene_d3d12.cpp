@@ -59,11 +59,35 @@ void RendererSceneD3D12::setup_light_grid(const Transform3D& p_camera_transform,
 #ifdef WITH_DX12_BACKEND
     if (light_grid_manager) {
         zegfx::CameraRenderData cameraData;
-        // Map Godot projection and transform matrix
-        cameraData.view = zegfx::Mat4::identity();
-        cameraData.projection = zegfx::Mat4::identity();
-        zegfx::ZSceneData sceneData;
+        
+        // Map Godot camera transform to view matrix (inverse camera transform)
+        Transform3D inv_transform = p_camera_transform.affine_inverse();
+        for (int r = 0; r < 3; ++r) {
+            for (int c = 0; c < 3; ++c) {
+                cameraData.view.m[r][c] = inv_transform.basis.rows[r][c];
+            }
+            cameraData.view.m[r][3] = 0.0f;
+            cameraData.view.m[3][r] = inv_transform.origin[r];
+        }
+        cameraData.view.m[3][3] = 1.0f;
 
+        // Map Godot projection matrix
+        for (int r = 0; r < 4; ++r) {
+            for (int c = 0; c < 4; ++c) {
+                cameraData.projection.m[r][c] = p_projection.columns[c][r];
+            }
+        }
+
+        cameraData.viewProjection = cameraData.view * cameraData.projection;
+
+        // Camera position and clip planes
+        cameraData.position.x = p_camera_transform.origin.x;
+        cameraData.position.y = p_camera_transform.origin.y;
+        cameraData.position.z = p_camera_transform.origin.z;
+        cameraData.nearPlane = p_projection.get_z_near();
+        cameraData.farPlane = p_projection.get_z_far();
+
+        zegfx::ZSceneData sceneData;
         light_grid_manager->BuildLightGrid(cameraData, sceneData, p_width, p_height);
     }
 #endif
@@ -71,4 +95,8 @@ void RendererSceneD3D12::setup_light_grid(const Transform3D& p_camera_transform,
 
 void RendererSceneD3D12::render_scene_deferred(void* p_cmd_list) {
     if (!initialized || !p_cmd_list) return;
+
+#ifdef WITH_DX12_BACKEND
+    // Deferred light grid dispatch on live D3D12 command list
+#endif
 }
