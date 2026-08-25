@@ -1,0 +1,23 @@
+#!/usr/bin/env python
+from misc.utility.scons_hints import *
+
+Import("env")
+Import("env_modules")
+
+env_gameplay = env_modules.Clone()
+env_gameplay.add_source_files(env.modules_sources, "*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "core/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "attributes/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "actions/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "collision/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "defense/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "paired/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "ai/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "feedback/*.cpp")
+env_gameplay.add_source_files(env.modules_sources, "debug/*.cpp")
+
+if env.editor_build:
+    env_gameplay.add_source_files(env.modules_sources, "editor/*.cpp")
+
+if env["tests"]:
+    env_gameplay.add_source_files(env.modules_sources, "tests/*.cpp")
