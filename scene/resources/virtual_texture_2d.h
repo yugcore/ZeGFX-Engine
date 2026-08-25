@@ -103,8 +103,10 @@ public:
 	Ref<Texture2D> get_page_table_texture() const;
 	Ref<Texture2D> get_physical_cache_texture() const;
 
-	void request_tile(int p_tile_x, int p_tile_y, int p_mip);
-	bool is_tile_resident(int p_tile_x, int p_tile_y, int p_mip) const;
+	void request_tile(int p_tile_x, int p_tile_y, int p_mip = 0);
+	void request_region(const Rect2 &p_uv_rect, int p_mip = 0);
+	void request_tiles_around_point(const Vector2 &p_uv_point, float p_radius_uv, int p_mip = 0);
+	bool is_tile_resident(int p_tile_x, int p_tile_y, int p_mip = 0) const;
 	void upload_tile_data(int p_tile_x, int p_tile_y, int p_mip, const Ref<Image> &p_image);
 	void clear_cache();
 	void rebuild_virtual_texture();

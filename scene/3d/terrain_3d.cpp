@@ -408,6 +408,9 @@ void Terrain3D::_load_heightmap_data() {
 			}
 		}
 		_smooth_heights(smoothing_cycles);
+	} else if (!heights.is_empty() && map_width >= 2 && map_height >= 2) {
+		// Existing raw heights already populated
+		_smooth_heights(smoothing_cycles);
 	} else {
 		// Fallback default flat plane (65x65)
 		map_width = 65;
@@ -668,9 +671,26 @@ void Terrain3D::_build_chunk_meshes() {
 	_update_lod_materials();
 }
 
+struct LodSwapCandidate {
+	int chunk_index = -1;
+	int target_lod = 0;
+	float camera_distance = 0.0f;
+
+	_FORCE_INLINE_ bool operator<(const LodSwapCandidate &p_other) const {
+		return camera_distance < p_other.camera_distance;
+	}
+};
+
 void Terrain3D::_update_lod(const Vector3 &p_camera_pos) {
 	Transform3D xform = is_inside_tree() ? get_global_transform() : get_transform();
 	Vector3 local_cam = xform.affine_inverse().xform(p_camera_pos);
+
+	float cam_dist_moved = local_cam.distance_to(last_lod_camera_pos);
+	if (cam_dist_moved < lod_update_distance_threshold) {
+		return;
+	}
+
+	Vector<LodSwapCandidate> candidates;
 
 	for (int i = 0; i < chunks.size(); ++i) {
 		TerrainChunk &chunk = chunks.write[i];
@@ -683,22 +703,78 @@ void Terrain3D::_update_lod(const Vector3 &p_camera_pos) {
 			chunk.mesh_instance->set_visible(false);
 			continue;
 		}
+		chunk.mesh_instance->set_visible(true);
 
 		int target_lod = 0;
-		if (lod_enabled && lod_distance_step > 0.0f) {
-			target_lod = CLAMP((int)(dist / lod_distance_step), 0, chunk.lod_meshes.size() - 1);
-		}
+		if (lod_enabled && lod_distance_step > 0.0f && chunk.lod_meshes.size() > 1) {
+			int cur = chunk.current_lod;
+			float base_dist = dist / lod_distance_step;
+			int raw_lod = (int)base_dist;
 
-		if (chunk.current_lod != target_lod) {
-			chunk.current_lod = target_lod;
-			chunk.mesh_instance->set_mesh(chunk.lod_meshes[target_lod]);
-			if (debug_lod_colors) {
-				int mat_idx = CLAMP(target_lod, 0, debug_lod_materials.size() - 1);
-				chunk.mesh_instance->set_material_override(debug_lod_materials[mat_idx]);
+			// Apply hysteresis margin to prevent rapid LOD thrashing across boundary edges
+			if (raw_lod > cur) {
+				float threshold = (float)(cur + 1) * (1.0f + lod_hysteresis_margin);
+				if (base_dist > threshold) {
+					target_lod = CLAMP(raw_lod, 0, chunk.lod_meshes.size() - 1);
+				} else {
+					target_lod = cur;
+				}
+			} else if (raw_lod < cur) {
+				float threshold = (float)cur * (1.0f - lod_hysteresis_margin);
+				if (base_dist < threshold) {
+					target_lod = CLAMP(raw_lod, 0, chunk.lod_meshes.size() - 1);
+				} else {
+					target_lod = cur;
+				}
+			} else {
+				target_lod = cur;
 			}
 		}
 
-		chunk.mesh_instance->set_visible(true);
+		if (chunk.current_lod != target_lod) {
+			LodSwapCandidate cand;
+			cand.chunk_index = i;
+			cand.target_lod = target_lod;
+			cand.camera_distance = dist;
+			candidates.push_back(cand);
+		}
+	}
+
+	if (candidates.is_empty()) {
+		last_lod_camera_pos = local_cam;
+		return;
+	}
+
+	// Sort candidate swaps by distance: prioritize chunks closest to the camera
+	candidates.sort();
+
+	int swap_budget = max_lod_swaps_per_frame > 0 ? max_lod_swaps_per_frame : candidates.size();
+	int swaps_done = 0;
+
+	for (int i = 0; i < candidates.size(); ++i) {
+		if (swaps_done >= swap_budget) {
+			break;
+		}
+
+		const LodSwapCandidate &cand = candidates[i];
+		TerrainChunk &chunk = chunks.write[cand.chunk_index];
+		if (!chunk.mesh_instance || cand.target_lod >= chunk.lod_meshes.size()) continue;
+
+		if (chunk.current_lod != cand.target_lod) {
+			chunk.current_lod = cand.target_lod;
+			chunk.mesh_instance->set_mesh(chunk.lod_meshes[cand.target_lod]);
+			if (debug_lod_colors) {
+				int mat_idx = CLAMP(cand.target_lod, 0, debug_lod_materials.size() - 1);
+				chunk.mesh_instance->set_material_override(debug_lod_materials[mat_idx]);
+			}
+			swaps_done++;
+		}
+	}
+
+	// If all pending swaps were completed, record camera position.
+	// Otherwise, leave last_lod_camera_pos so next frame finishes the remaining budget.
+	if (swaps_done >= candidates.size()) {
+		last_lod_camera_pos = local_cam;
 	}
 }
 
@@ -1106,6 +1182,30 @@ bool Terrain3D::is_debug_lod_colors() const {
 	return debug_lod_colors;
 }
 
+void Terrain3D::set_max_lod_swaps_per_frame(int p_swaps) {
+	max_lod_swaps_per_frame = MAX(0, p_swaps);
+}
+
+int Terrain3D::get_max_lod_swaps_per_frame() const {
+	return max_lod_swaps_per_frame;
+}
+
+void Terrain3D::set_lod_hysteresis_margin(float p_margin) {
+	lod_hysteresis_margin = CLAMP(p_margin, 0.0f, 0.5f);
+}
+
+float Terrain3D::get_lod_hysteresis_margin() const {
+	return lod_hysteresis_margin;
+}
+
+void Terrain3D::set_lod_update_distance_threshold(float p_threshold) {
+	lod_update_distance_threshold = MAX(0.1f, p_threshold);
+}
+
+float Terrain3D::get_lod_update_distance_threshold() const {
+	return lod_update_distance_threshold;
+}
+
 // Multi-Layer Material & Splatmap Setters / Getters
 void Terrain3D::set_auto_material_enabled(bool p_enabled) {
 	if (auto_material_enabled != p_enabled) {
@@ -1483,6 +1583,17 @@ void Terrain3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_debug_lod_colors", "debug"), &Terrain3D::set_debug_lod_colors);
 	ClassDB::bind_method(D_METHOD("is_debug_lod_colors"), &Terrain3D::is_debug_lod_colors);
 
+	ClassDB::bind_method(D_METHOD("set_max_lod_swaps_per_frame", "swaps"), &Terrain3D::set_max_lod_swaps_per_frame);
+	ClassDB::bind_method(D_METHOD("get_max_lod_swaps_per_frame"), &Terrain3D::get_max_lod_swaps_per_frame);
+
+	ClassDB::bind_method(D_METHOD("set_lod_hysteresis_margin", "margin"), &Terrain3D::set_lod_hysteresis_margin);
+	ClassDB::bind_method(D_METHOD("get_lod_hysteresis_margin"), &Terrain3D::get_lod_hysteresis_margin);
+
+	ClassDB::bind_method(D_METHOD("set_lod_update_distance_threshold", "threshold"), &Terrain3D::set_lod_update_distance_threshold);
+	ClassDB::bind_method(D_METHOD("get_lod_update_distance_threshold"), &Terrain3D::get_lod_update_distance_threshold);
+
+	ClassDB::bind_method(D_METHOD("update_lod", "camera_position"), &Terrain3D::update_lod);
+
 	// Multi-Layer Material & Splatmap Bindings
 	ClassDB::bind_method(D_METHOD("set_auto_material_enabled", "enabled"), &Terrain3D::set_auto_material_enabled);
 	ClassDB::bind_method(D_METHOD("is_auto_material_enabled"), &Terrain3D::is_auto_material_enabled);
@@ -1615,6 +1726,9 @@ void Terrain3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_view_distance", PROPERTY_HINT_RANGE, "0.0,10000.0,50.0,or_greater"), "set_max_view_distance", "get_max_view_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "skirt_height", PROPERTY_HINT_RANGE, "0.0,100.0,0.5,or_greater"), "set_skirt_height", "get_skirt_height");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "debug_lod_colors"), "set_debug_lod_colors", "is_debug_lod_colors");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_lod_swaps_per_frame", PROPERTY_HINT_RANGE, "0,64,1"), "set_max_lod_swaps_per_frame", "get_max_lod_swaps_per_frame");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lod_hysteresis_margin", PROPERTY_HINT_RANGE, "0.0,0.5,0.01"), "set_lod_hysteresis_margin", "get_lod_hysteresis_margin");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "lod_update_distance_threshold", PROPERTY_HINT_RANGE, "0.5,50.0,0.5"), "set_lod_update_distance_threshold", "get_lod_update_distance_threshold");
 
 	ADD_GROUP("Multi-Layer Material & Splatmap", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_material_enabled"), "set_auto_material_enabled", "is_auto_material_enabled");

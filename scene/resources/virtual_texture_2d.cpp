@@ -191,6 +191,29 @@ void VirtualTexture2D::request_tile(int p_tile_x, int p_tile_y, int p_mip) {
 	}
 
 	_allocate_physical_slot(p_tile_x, p_tile_y, p_mip);
+	emit_signal(SNAME("tile_requested"), p_tile_x, p_tile_y, p_mip);
+}
+
+void VirtualTexture2D::request_region(const Rect2 &p_uv_rect, int p_mip) {
+	int tiles_x = get_virtual_tile_count_x();
+	int tiles_y = get_virtual_tile_count_y();
+	if (tiles_x <= 0 || tiles_y <= 0) return;
+
+	int min_tx = CLAMP((int)(p_uv_rect.position.x * tiles_x), 0, tiles_x - 1);
+	int max_tx = CLAMP((int)((p_uv_rect.position.x + p_uv_rect.size.x) * tiles_x), 0, tiles_x - 1);
+	int min_ty = CLAMP((int)(p_uv_rect.position.y * tiles_y), 0, tiles_y - 1);
+	int max_ty = CLAMP((int)((p_uv_rect.position.y + p_uv_rect.size.y) * tiles_y), 0, tiles_y - 1);
+
+	for (int ty = min_ty; ty <= max_ty; ++ty) {
+		for (int tx = min_tx; tx <= max_tx; ++tx) {
+			request_tile(tx, ty, p_mip);
+		}
+	}
+}
+
+void VirtualTexture2D::request_tiles_around_point(const Vector2 &p_uv_point, float p_radius_uv, int p_mip) {
+	Rect2 uv_rect(p_uv_point.x - p_radius_uv, p_uv_point.y - p_radius_uv, p_radius_uv * 2.0f, p_radius_uv * 2.0f);
+	request_region(uv_rect, p_mip);
 }
 
 bool VirtualTexture2D::is_tile_resident(int p_tile_x, int p_tile_y, int p_mip) const {
@@ -316,11 +339,15 @@ void VirtualTexture2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_page_table_texture"), &VirtualTexture2D::get_page_table_texture);
 	ClassDB::bind_method(D_METHOD("get_physical_cache_texture"), &VirtualTexture2D::get_physical_cache_texture);
 
-	ClassDB::bind_method(D_METHOD("request_tile", "tile_x", "tile_y", "mip_level"), &VirtualTexture2D::request_tile);
-	ClassDB::bind_method(D_METHOD("is_tile_resident", "tile_x", "tile_y", "mip_level"), &VirtualTexture2D::is_tile_resident);
+	ClassDB::bind_method(D_METHOD("request_tile", "tile_x", "tile_y", "mip_level"), &VirtualTexture2D::request_tile, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("request_region", "uv_rect", "mip_level"), &VirtualTexture2D::request_region, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("request_tiles_around_point", "uv_point", "radius_uv", "mip_level"), &VirtualTexture2D::request_tiles_around_point, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("is_tile_resident", "tile_x", "tile_y", "mip_level"), &VirtualTexture2D::is_tile_resident, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("upload_tile_data", "tile_x", "tile_y", "mip_level", "image"), &VirtualTexture2D::upload_tile_data);
 	ClassDB::bind_method(D_METHOD("clear_cache"), &VirtualTexture2D::clear_cache);
 	ClassDB::bind_method(D_METHOD("rebuild_virtual_texture"), &VirtualTexture2D::rebuild_virtual_texture);
+
+	ADD_SIGNAL(MethodInfo("tile_requested", PropertyInfo(Variant::INT, "tile_x"), PropertyInfo(Variant::INT, "tile_y"), PropertyInfo(Variant::INT, "mip_level")));
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "virtual_size"), "set_virtual_size", "get_virtual_size");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "tile_size"), "set_tile_size", "get_tile_size");

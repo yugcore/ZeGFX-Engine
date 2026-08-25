@@ -95,6 +95,10 @@ private:
 	float max_view_distance = 4000.0f;
 	float skirt_height = 10.0f;
 	bool debug_lod_colors = false;
+	int max_lod_swaps_per_frame = 8; // Throttled budget to prevent main-thread stutter
+	float lod_hysteresis_margin = 0.15f; // Margin to prevent boundary thrashing
+	float lod_update_distance_threshold = 4.0f; // Minimum camera movement to trigger re-evaluation
+	Vector3 last_lod_camera_pos = Vector3(1e9f, 1e9f, 1e9f);
 
 	// Multi-Layer PBR Material Pipeline
 	Ref<Material> material; // User custom material override
@@ -233,6 +237,17 @@ public:
 	void set_debug_lod_colors(bool p_debug);
 	bool is_debug_lod_colors() const;
 
+	void set_max_lod_swaps_per_frame(int p_swaps);
+	int get_max_lod_swaps_per_frame() const;
+
+	void set_lod_hysteresis_margin(float p_margin);
+	float get_lod_hysteresis_margin() const;
+
+	void set_lod_update_distance_threshold(float p_threshold);
+	float get_lod_update_distance_threshold() const;
+
+	void update_lod(const Vector3 &p_camera_pos) { _update_lod(p_camera_pos); }
+
 	// Multi-Layer Material & Splatmap Settings
 	void set_auto_material_enabled(bool p_enabled);
 	bool is_auto_material_enabled() const;
@@ -336,6 +351,11 @@ public:
 	Vector<float> get_heights_raw() const { return heights; }
 	void set_heights_raw(const Vector<float> &p_heights) {
 		heights = p_heights;
+		int dim = (int)Math::sqrt((double)heights.size());
+		if (dim * dim == heights.size() && dim >= 2) {
+			map_width = dim;
+			map_height = dim;
+		}
 		rebuild_terrain();
 	}
 
