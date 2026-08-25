@@ -29,8 +29,10 @@
 /**************************************************************************/
 
 #include "resource_importer_scene.h"
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 #include "ZeGFX/include/cooker/asset_cooker.h"
 #include "drivers/d3d12/zegfx_d3d12_bridge.h"
+#endif
 
 #include "core/config/engine.h"
 #include "core/config/project_settings.h"
@@ -3309,6 +3311,7 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 	List<String> missing_deps; // for now, not much will be done with this
 	int zegfx_mode = p_options.has("zegfx/import_mode") ? int(p_options["zegfx/import_mode"]) : IMPORT_MODE_ASK_ON_IMPORT;
 
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (zegfx_mode == IMPORT_MODE_ZEGFX_COOKED) {
 		zegfx::cooker::AssetCooker cooker;
 		String base_name = src_path.get_file().get_basename();
@@ -3358,6 +3361,7 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 			WARN_PRINT(vformat("ZeGFX AssetCooker failed for '%s' (%s). Automatically degrading to Native Import Mode.", src_path, String(cook_res.errorMessage.c_str())));
 		}
 	}
+#endif
 
 	Node *scene = importer->import_scene(src_path, import_flags, p_options, &missing_deps, &err);
 	if (!scene || err != OK) {

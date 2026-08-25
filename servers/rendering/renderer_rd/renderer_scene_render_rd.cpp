@@ -38,7 +38,9 @@
 #include "servers/rendering/renderer_rd/shaders/light_data_inc.glsl.gen.h"
 #include "servers/rendering/renderer_rd/shaders/scene_data_inc.glsl.gen.h"
 #include "servers/rendering/renderer_rd/storage_rd/particles_storage.h"
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 #include "drivers/d3d12/zegfx_d3d12_bridge.h"
+#endif
 #include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/rendering/rendering_server_enums.h"
@@ -476,6 +478,7 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 	RID color_texture = use_upscaled_texture ? rb->get_upscaled_texture() : rb->get_internal_texture();
 	Size2i color_size = use_upscaled_texture ? target_size : rb->get_internal_size();
 
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized() && can_use_effects) {
 		float exposure = 1.0f;
 		float bloom_intensity = 0.0f;
@@ -514,6 +517,7 @@ void RendererSceneRenderRD::_render_buffers_post_process_and_tonemap(const Rende
 				normal_native, output_native,
 				target_size.x, target_size.y, 0.016f /*delta_time ~60fps*/);
 	}
+#endif
 
 	SpatialUpscaler *spatial_upscaler = nullptr;
 	if (can_use_effects) {

@@ -108,6 +108,7 @@ extra_defines = [
     "WINDOWS_NO_FUTEX",
     "WITH_DX12_BACKEND",
 ]
+env.Append(CPPDEFINES=["WITH_DX12_BACKEND"])
 
 mesa_ver = Path(mesa_absdir + "/VERSION.info")
 if not mesa_ver.is_file():

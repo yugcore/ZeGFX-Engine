@@ -38,7 +38,9 @@
 #include "servers/rendering/renderer_rd/storage_rd/particles_storage.h"
 #include "servers/rendering/renderer_rd/storage_rd/texture_storage.h"
 #include "servers/rendering/renderer_rd/uniform_set_cache_rd.h"
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 #include "drivers/d3d12/zegfx_d3d12_bridge.h"
+#endif
 #include "servers/rendering/rendering_device.h"
 #include "servers/rendering/rendering_server_default.h"
 #include "servers/rendering/storage/ltc_lut.gen.h"
@@ -1431,12 +1433,14 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 
 	RENDER_TIMESTAMP("Process SSAO");
 
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
 		Size2i size = p_render_buffers->get_internal_size();
 		float radius = environment_get_ssao_radius(p_environment);
 		float intensity = environment_get_ssao_intensity(p_environment);
 		ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity);
 	}
+#endif
 
 	RendererRD::SSEffects::SSAOSettings settings;
 	settings.radius = environment_get_ssao_radius(p_environment);
@@ -1498,6 +1502,7 @@ void RenderForwardClustered::_process_ssr(Ref<RenderSceneBuffersRD> p_render_buf
 
 	RENDER_TIMESTAMP("Process SSR");
 
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
 		Size2i size = p_render_buffers->get_internal_size();
 		ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, 0.5f);
@@ -1507,6 +1512,7 @@ void RenderForwardClustered::_process_ssr(Ref<RenderSceneBuffersRD> p_render_buf
 			return;
 		}
 	}
+#endif
 
 	// Fallback: Godot's built-in screen-space reflections (runs only when DXR is not active)
 	ss_effects->ssr_allocate_buffers(p_render_buffers, rb_data->ss_effects_data.ssr, p_render_buffers->get_base_data_format());
@@ -2246,6 +2252,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 		RD::get_singleton()->draw_command_end_label();
 
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 		// ZeGFX Meshlet Streamer & GPU Hi-Z Culling — runs in PARALLEL with Godot's standard draw path.
 		// Queues GPU-driven indirect draws and updates view constants for any .zmesh cooked assets in the scene.
 		if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
@@ -2281,6 +2288,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				}
 			}
 		}
+#endif
 
 		if (using_motion_pass) {
 			if (scale_type == SCALE_MFX) {
