@@ -151,15 +151,16 @@ Error ResourceImporterTerrainHeightmap::import(ResourceUID::ID p_source_id, cons
 
 	image->set_data(width, height, false, Image::FORMAT_RF, img_data);
 
-	// Save to GDIM image format
+	// Save to GDIM image format (EXR preserves full 16-bit / 32-bit float heightmap precision)
 	Ref<FileAccess> out = FileAccess::open(p_save_path + ".image", FileAccess::WRITE);
 	ERR_FAIL_COND_V_MSG(out.is_null(), ERR_CANT_CREATE, "Cannot create file '" + p_save_path + ".image'.");
 
 	const uint8_t header[4] = { 'G', 'D', 'I', 'M' };
 	out->store_buffer(header, 4);
-	out->store_pascal_string("png"); // save PNG extension format
-	Vector<uint8_t> png_bytes = image->save_png_to_buffer();
-	out->store_buffer(png_bytes.ptr(), png_bytes.size());
+	out->store_pascal_string("exr"); // save EXR extension format
+	Vector<uint8_t> exr_bytes = image->save_exr_to_buffer(true /* grayscale */);
+	ERR_FAIL_COND_V_MSG(exr_bytes.is_empty(), ERR_FILE_CORRUPT, "Failed to encode heightmap image to EXR buffer.");
+	out->store_buffer(exr_bytes.ptr(), exr_bytes.size());
 
 	return OK;
 }
