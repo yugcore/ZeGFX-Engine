@@ -24,22 +24,22 @@ ScriptEditorBase *KnitsEditorBase::create_editor(const Ref<Resource> &p_resource
 Color KnitsEditorBase::_get_category_color(KnitNodeCategory p_category) const {
 	switch (p_category) {
 		case KnitNodeCategory::Event:
-			return Color(0.68f, 0.15f, 0.22f); // Ruby Crimson
+			return Color(0.80f, 0.20f, 0.28f); // Glowing Ruby Crimson
 		case KnitNodeCategory::ImpureAction:
-			return Color(0.16f, 0.38f, 0.82f); // Velvet Blue
+			return Color(0.20f, 0.48f, 0.90f); // Electric Cobalt
 		case KnitNodeCategory::PureFunction:
-			return Color(0.10f, 0.52f, 0.34f); // Emerald
+			return Color(0.12f, 0.65f, 0.40f); // Vivid Mint Emerald
 		case KnitNodeCategory::FlowControl:
-			return Color(0.26f, 0.32f, 0.42f); // Slate Navy
+			return Color(0.30f, 0.40f, 0.55f); // Slate Navy
 		case KnitNodeCategory::VariableGet:
 		case KnitNodeCategory::VariableSet:
-			return Color(0.10f, 0.48f, 0.54f); // Teal Cyan
+			return Color(0.12f, 0.60f, 0.68f); // Luminous Teal Cyan
 		case KnitNodeCategory::SubGraph:
-			return Color(0.50f, 0.22f, 0.72f); // Royal Purple
+			return Color(0.60f, 0.28f, 0.88f); // Royal Neon Violet
 		case KnitNodeCategory::Reroute:
-			return Color(0.35f, 0.35f, 0.35f);
+			return Color(0.32f, 0.35f, 0.42f);
 		case KnitNodeCategory::Comment:
-			return Color(0.22f, 0.26f, 0.32f);
+			return Color(0.14f, 0.16f, 0.20f);
 		default:
 			return Color(0.28f, 0.34f, 0.40f);
 	}
@@ -1168,16 +1168,19 @@ KnitsEditorBase::KnitsEditorBase() {
 
 	add_node_btn = memnew(Button);
 	add_node_btn->set_text("+ Add Node");
+	add_node_btn->set_flat(true);
 	add_node_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_add_node_pressed));
 	toolbar->add_child(add_node_btn);
 
 	add_frame_btn = memnew(Button);
 	add_frame_btn->set_text("+ Frame");
+	add_frame_btn->set_flat(true);
 	add_frame_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_add_frame_pressed));
 	toolbar->add_child(add_frame_btn);
 
 	compile_btn = memnew(Button);
 	compile_btn->set_text("Compile");
+	compile_btn->set_flat(true);
 	compile_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_compile_pressed));
 	toolbar->add_child(compile_btn);
 

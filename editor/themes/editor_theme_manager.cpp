@@ -147,8 +147,8 @@ Ref<StyleBoxEmpty> EditorThemeManager::make_empty_stylebox(float p_margin_left, 
 Ref<StyleBoxFlat> EditorThemeManager::make_flat_stylebox(Color p_color, float p_margin_left, float p_margin_top, float p_margin_right, float p_margin_bottom, int p_corner_width) {
 	Ref<StyleBoxFlat> style(memnew(StyleBoxFlat));
 	style->set_bg_color(p_color);
-	// Adjust level of detail based on the corners' effective sizes.
-	style->set_corner_detail(Math::ceil(0.8 * p_corner_width * EDSCALE));
+	// Adjust level of detail based on the corners' effective sizes for silky smooth rounding.
+	style->set_corner_detail(MAX(6, Math::ceil(1.5 * p_corner_width * EDSCALE)));
 	style->set_corner_radius_all(p_corner_width * EDSCALE);
 	style->set_content_margin_individual(p_margin_left * EDSCALE, p_margin_top * EDSCALE, p_margin_right * EDSCALE, p_margin_bottom * EDSCALE);
 	return style;
@@ -325,11 +325,10 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 
 			// Please use alphabetical order if you're adding a new color preset here.
 			if (config.preset == "Black (OLED)") {
-				preset_accent_color = Color(0.45, 0.75, 1.0);
-				preset_base_color = Color(0, 0, 0);
-				// The contrast rate value is irrelevant on a fully black theme.
-				preset_contrast = 0.0;
-				preset_draw_extra_borders = true;
+				preset_accent_color = Color(0.24, 0.58, 1.0);
+				preset_base_color = Color(0.045, 0.045, 0.052);
+				preset_contrast = 0.35;
+				preset_draw_extra_borders = false;
 			} else if (config.preset == "Breeze Dark") {
 				preset_accent_color = Color(0.239, 0.682, 0.914);
 				preset_base_color = Color(0.1255, 0.1373, 0.149);
@@ -349,6 +348,11 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 				preset_base_color = Color(0.9, 0.9, 0.9);
 				preset_contrast = light_contrast;
 				preset_icon_saturation = 1;
+			} else if (config.preset == "Premium Black") {
+				preset_accent_color = Color(0.24, 0.58, 1.0);
+				preset_base_color = Color(0.125, 0.128, 0.142);
+				preset_contrast = 0.28;
+				preset_draw_extra_borders = false;
 			} else if (config.preset == "Solarized (Dark)") {
 				preset_accent_color = Color(0.15, 0.55, 0.82);
 				preset_base_color = Color(0.03, 0.21, 0.26);
@@ -358,8 +362,10 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 				preset_base_color = Color(0.89, 0.86, 0.79);
 				preset_contrast = light_contrast;
 			} else { // Default
-				preset_accent_color = Color(0.337, 0.62, 1.0);
-				preset_base_color = Color(0.161, 0.161, 0.161);
+				preset_accent_color = Color(0.24, 0.58, 1.0);
+				preset_base_color = Color(0.125, 0.128, 0.142);
+				preset_contrast = 0.28;
+				preset_draw_extra_borders = false;
 			}
 
 			config.accent_color = preset_accent_color;
@@ -598,6 +604,8 @@ void EditorThemeManager::_populate_text_editor_styles(const Ref<EditorTheme> &p_
 
 	const Color background_color = EDITOR_GET("text_editor/theme/highlighting/background_color");
 	Ref<StyleBoxFlat> code_edit_stylebox = make_flat_stylebox(background_color, 0, p_config.widget_margin.y, p_config.widget_margin.x, p_config.widget_margin.y, p_config.corner_radius);
+	code_edit_stylebox->set_border_width_all(EDSCALE_RND(1));
+	code_edit_stylebox->set_border_color(p_config.dark_color_3);
 	p_theme->set_stylebox(CoreStringName(normal), "CodeEdit", code_edit_stylebox);
 	p_theme->set_stylebox("read_only", "CodeEdit", code_edit_stylebox);
 	p_theme->set_stylebox("focus", "CodeEdit", memnew(StyleBoxEmpty));
