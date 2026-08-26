@@ -349,7 +349,7 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 				preset_contrast = light_contrast;
 				preset_icon_saturation = 1;
 			} else if (config.preset == "Premium Black") {
-				preset_accent_color = Color(0.24, 0.58, 1.0);
+				preset_accent_color = Color(0.886, 0.898, 0.922);
 				preset_base_color = Color(0.125, 0.128, 0.142);
 				preset_contrast = 0.28;
 				preset_draw_extra_borders = false;
@@ -362,7 +362,7 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 				preset_base_color = Color(0.89, 0.86, 0.79);
 				preset_contrast = light_contrast;
 			} else { // Default
-				preset_accent_color = Color(0.24, 0.58, 1.0);
+				preset_accent_color = Color(0.886, 0.898, 0.922);
 				preset_base_color = Color(0.125, 0.128, 0.142);
 				preset_contrast = 0.28;
 				preset_draw_extra_borders = false;
