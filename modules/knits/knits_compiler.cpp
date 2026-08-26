@@ -105,28 +105,167 @@ bool KnitsCompiler::lower_pure_node(const KnitsGraph &p_graph, const Ref<KnitNod
 		inst.opcode = KnitOpcode::DIV_F;
 		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
 		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
-	} else if (title == "cmp_eq" || title == "==") {
+	} else if (title == "mod" || title == "%" || title == "math::mod" || title == "fmod") {
+		inst.opcode = KnitOpcode::MOD_F;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "pow" || title == "**" || title == "math::pow") {
+		inst.opcode = KnitOpcode::POW_F;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "neg" || title == "negate") {
+		inst.opcode = KnitOpcode::NEG_F;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+	} else if (title == "bit_and" || title == "&" || title == "bitwise::and") {
+		inst.opcode = KnitOpcode::BIT_AND;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "bit_or" || title == "|" || title == "bitwise::or") {
+		inst.opcode = KnitOpcode::BIT_OR;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "bit_xor" || title == "^" || title == "bitwise::xor") {
+		inst.opcode = KnitOpcode::BIT_XOR;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "bit_not" || title == "~" || title == "bitwise::not") {
+		inst.opcode = KnitOpcode::BIT_NOT;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+	} else if (title == "bit_shl" || title == "<<" || title == "bitwise::shl") {
+		inst.opcode = KnitOpcode::BIT_SHL;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "bit_shr" || title == ">>" || title == "bitwise::shr") {
+		inst.opcode = KnitOpcode::BIT_SHR;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "cmp_eq" || title == "==" || title == "equal") {
 		inst.opcode = KnitOpcode::CMP_EQ;
 		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
 		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
-	} else if (title == "cmp_lt" || title == "<") {
+	} else if (title == "cmp_ne" || title == "!=" || title == "not_equal") {
+		inst.opcode = KnitOpcode::CMP_NE;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "cmp_lt" || title == "<" || title == "less_than") {
 		inst.opcode = KnitOpcode::CMP_LT;
 		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
 		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
-	} else if (title == "cmp_gt" || title == ">") {
+	} else if (title == "cmp_le" || title == "<=" || title == "less_equal") {
+		inst.opcode = KnitOpcode::CMP_LE;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "cmp_gt" || title == ">" || title == "greater_than") {
 		inst.opcode = KnitOpcode::CMP_GT;
 		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
 		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "cmp_ge" || title == ">=" || title == "greater_equal") {
+		inst.opcode = KnitOpcode::CMP_GE;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "not" || title == "!" || title == "logical_not") {
+		inst.opcode = KnitOpcode::LOGICAL_NOT;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+	} else if (title == "and" || title == "&&" || title == "logical_and") {
+		inst.opcode = KnitOpcode::LOGICAL_AND;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "or" || title == "||" || title == "logical_or") {
+		inst.opcode = KnitOpcode::LOGICAL_OR;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec2_add") {
+		inst.opcode = KnitOpcode::VEC2_ADD;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec2_sub") {
+		inst.opcode = KnitOpcode::VEC2_SUB;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec2_scale") {
+		inst.opcode = KnitOpcode::VEC2_SCALE;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec2_dot") {
+		inst.opcode = KnitOpcode::VEC2_DOT;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec3_add") {
+		inst.opcode = KnitOpcode::VEC3_ADD;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec3_sub") {
+		inst.opcode = KnitOpcode::VEC3_SUB;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec3_scale") {
+		inst.opcode = KnitOpcode::VEC3_SCALE;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec3_dot") {
+		inst.opcode = KnitOpcode::VEC3_DOT;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "vec3_cross") {
+		inst.opcode = KnitOpcode::VEC3_CROSS;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "array_construct" || title == "make_array" || title == "create_array") {
+		inst.opcode = KnitOpcode::ARRAY_CONSTRUCT;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.extra = (uint8_t)input_regs.size();
+	} else if (title == "array_size" || title == "len") {
+		inst.opcode = KnitOpcode::ARRAY_SIZE;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+	} else if (title == "dict_construct" || title == "make_dict" || title == "create_dictionary") {
+		inst.opcode = KnitOpcode::DICT_CONSTRUCT;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.extra = (uint8_t)(input_regs.size() / 2);
+	} else if (title == "dict_get" || title == "get_key") {
+		inst.opcode = KnitOpcode::DICT_GET;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+		inst.extra = input_regs.size() > 2 ? input_regs[2] : 0;
+	} else if (title == "dict_has" || title == "has_key") {
+		inst.opcode = KnitOpcode::DICT_HAS;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "get_indexed" || title == "index_get") {
+		inst.opcode = KnitOpcode::GET_INDEXED;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.src_b = input_regs.size() > 1 ? input_regs[1] : 0;
+	} else if (title == "typeof" || title == "type_of") {
+		inst.opcode = KnitOpcode::TYPE_OF;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+	} else if (title == "is_instance_valid") {
+		inst.opcode = KnitOpcode::IS_INSTANCE_VALID;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+	} else if (title == "type_test" || title == "is" || title == "is_instance_of") {
+		inst.opcode = KnitOpcode::TYPE_TEST;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.imm32 = get_or_add_constant(r_compiled, p_node->target_symbol.is_empty() ? Variant(StringName(p_node->title)) : Variant(p_node->target_symbol));
+	} else if (title == "type_cast" || title == "as" || title == "convert") {
+		inst.opcode = KnitOpcode::TYPE_CAST;
+		inst.src_a = input_regs.size() > 0 ? input_regs[0] : 0;
+		inst.imm32 = (int32_t)(p_node->output_pins.size() > 0 ? (int)p_node->output_pins[0].type.kind : 0);
 	} else if (p_node->category == KnitNodeCategory::VariableGet) {
 		inst.opcode = KnitOpcode::LOAD_VAR;
 		inst.imm32 = get_or_add_variable(r_compiled, p_node->target_symbol);
 	} else {
-		// Pure method call (e.g. Vector3::distance_to, Input::is_action_pressed)
-		inst.opcode = KnitOpcode::CALL_METHOD_BIND;
-		inst.imm32 = get_or_add_method(r_compiled, p_node->target_symbol.is_empty() ? StringName(p_node->title) : p_node->target_symbol);
-		inst.src_a = 0; // Default target
-		inst.src_b = input_regs.size() > 0 ? input_regs[0] : 0;
-		inst.extra = (uint8_t)input_regs.size();
+		StringName func_name = p_node->target_symbol.is_empty() ? StringName(p_node->title) : p_node->target_symbol;
+		if (Variant::has_utility_function(func_name)) {
+			inst.opcode = KnitOpcode::CALL_UTILITY;
+			inst.imm32 = get_or_add_method(r_compiled, func_name);
+			inst.src_b = input_regs.size() > 0 ? input_regs[0] : 0;
+			inst.extra = (uint8_t)input_regs.size();
+		} else {
+			// Pure method call (e.g. Vector3::distance_to, Input::is_action_pressed)
+			inst.opcode = KnitOpcode::CALL_METHOD_BIND;
+			inst.imm32 = get_or_add_method(r_compiled, func_name);
+			inst.src_a = 0; // Default target
+			inst.src_b = input_regs.size() > 0 ? input_regs[0] : 0;
+			inst.extra = (uint8_t)input_regs.size();
+		}
 	}
 
 	uint32_t pc = r_compiled.instructions.size();
@@ -273,13 +412,55 @@ bool KnitsCompiler::compile(const Ref<KnitsGraph> &p_graph, KnitCompiledGraph &r
 		} else if (title == "return") {
 			inst.opcode = KnitOpcode::RETURN;
 			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
-		} else if (current->category == KnitNodeCategory::ImpureAction) {
-			inst.opcode = KnitOpcode::CALL_METHOD_BIND;
-			inst.imm32 = get_or_add_method(r_compiled, current->target_symbol.is_empty() ? StringName(current->title) : current->target_symbol);
-			inst.dst = allocate_register();
-			inst.src_a = 0; // Target instance
+		} else if (title == "print" || title == "print_rich" || title == "printerr" || title == "push_error" || title == "push_warning") {
+			inst.opcode = KnitOpcode::CALL_UTILITY;
+			inst.imm32 = get_or_add_method(r_compiled, StringName(title));
 			inst.src_b = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
 			inst.extra = (uint8_t)data_in_regs.size();
+		} else if (title == "assert") {
+			inst.opcode = KnitOpcode::DEBUG_TRAP;
+			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+		} else if (title == "emit_signal" || title == "signal_emit") {
+			inst.opcode = KnitOpcode::SIGNAL_EMIT;
+			inst.imm32 = get_or_add_method(r_compiled, current->target_symbol.is_empty() ? StringName(current->title) : current->target_symbol);
+			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+			inst.src_b = data_in_regs.size() > 1 ? data_in_regs[1] : 0;
+			inst.extra = (uint8_t)(data_in_regs.size() > 1 ? data_in_regs.size() - 1 : 0);
+		} else if (title == "connect_signal" || title == "signal_connect") {
+			inst.opcode = KnitOpcode::SIGNAL_CONNECT;
+			inst.imm32 = get_or_add_method(r_compiled, current->target_symbol.is_empty() ? StringName(current->title) : current->target_symbol);
+			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+			inst.src_b = data_in_regs.size() > 1 ? data_in_regs[1] : 0;
+		} else if (title == "array_append") {
+			inst.opcode = KnitOpcode::ARRAY_APPEND;
+			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+			inst.src_b = data_in_regs.size() > 1 ? data_in_regs[1] : 0;
+		} else if (title == "dict_set") {
+			inst.opcode = KnitOpcode::DICT_SET;
+			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+			inst.src_b = data_in_regs.size() > 1 ? data_in_regs[1] : 0;
+			inst.extra = data_in_regs.size() > 2 ? data_in_regs[2] : 0;
+		} else if (title == "set_indexed") {
+			inst.opcode = KnitOpcode::SET_INDEXED;
+			inst.src_a = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+			inst.src_b = data_in_regs.size() > 1 ? data_in_regs[1] : 0;
+			inst.extra = data_in_regs.size() > 2 ? data_in_regs[2] : 0;
+		} else if (current->category == KnitNodeCategory::ImpureAction) {
+			StringName action_name = current->target_symbol.is_empty() ? StringName(current->title) : current->target_symbol;
+			if (Variant::has_utility_function(action_name)) {
+				inst.opcode = KnitOpcode::CALL_UTILITY;
+				inst.imm32 = get_or_add_method(r_compiled, action_name);
+				inst.dst = allocate_register();
+				inst.src_b = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+				inst.extra = (uint8_t)data_in_regs.size();
+			} else {
+				inst.opcode = KnitOpcode::CALL_METHOD_BIND;
+				inst.imm32 = get_or_add_method(r_compiled, action_name);
+				inst.dst = allocate_register();
+				inst.src_a = 0; // Target instance
+				inst.src_b = data_in_regs.size() > 0 ? data_in_regs[0] : 0;
+				inst.extra = (uint8_t)data_in_regs.size();
+			}
 		} else {
 			inst.opcode = KnitOpcode::NOP;
 		}

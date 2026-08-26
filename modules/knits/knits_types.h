@@ -56,13 +56,39 @@ enum class KnitDataType : uint16_t {
 	String,
 	StringName,
 	Vector2,
+	Vector2i,
+	Rect2,
+	Rect2i,
 	Vector3,
-	Color,
+	Vector3i,
+	Transform2D,
+	Vector4,
+	Vector4i,
+	Plane,
+	Quaternion,
+	AABB,
+	Basis,
 	Transform3D,
+	Projection,
+	Color,
+	NodePath,
+	RID,
 	ObjectRef,   // Engine Object* / Entity handle
-	Enum,        // Strongly typed enum
-	Array,       // Generic typed array: Array<T>
+	Callable,
+	Signal,
 	Dictionary,  // Key-value map: Dict<K, V>
+	Array,       // Generic typed array: Array<T>
+	PackedByteArray,
+	PackedInt32Array,
+	PackedInt64Array,
+	PackedFloat32Array,
+	PackedFloat64Array,
+	PackedStringArray,
+	PackedVector2Array,
+	PackedVector3Array,
+	PackedColorArray,
+	PackedVector4Array,
+	Enum,        // Strongly typed enum
 	Wildcard     // Generic unconstrained pin (Resolved via propagation pass)
 };
 
@@ -109,12 +135,38 @@ struct KnitTypeSignature {
 			case Variant::STRING: return KnitDataType::String;
 			case Variant::STRING_NAME: return KnitDataType::StringName;
 			case Variant::VECTOR2: return KnitDataType::Vector2;
+			case Variant::VECTOR2I: return KnitDataType::Vector2i;
+			case Variant::RECT2: return KnitDataType::Rect2;
+			case Variant::RECT2I: return KnitDataType::Rect2i;
 			case Variant::VECTOR3: return KnitDataType::Vector3;
-			case Variant::COLOR: return KnitDataType::Color;
+			case Variant::VECTOR3I: return KnitDataType::Vector3i;
+			case Variant::TRANSFORM2D: return KnitDataType::Transform2D;
+			case Variant::VECTOR4: return KnitDataType::Vector4;
+			case Variant::VECTOR4I: return KnitDataType::Vector4i;
+			case Variant::PLANE: return KnitDataType::Plane;
+			case Variant::QUATERNION: return KnitDataType::Quaternion;
+			case Variant::AABB: return KnitDataType::AABB;
+			case Variant::BASIS: return KnitDataType::Basis;
 			case Variant::TRANSFORM3D: return KnitDataType::Transform3D;
+			case Variant::PROJECTION: return KnitDataType::Projection;
+			case Variant::COLOR: return KnitDataType::Color;
+			case Variant::NODE_PATH: return KnitDataType::NodePath;
+			case Variant::RID: return KnitDataType::RID;
 			case Variant::OBJECT: return KnitDataType::ObjectRef;
-			case Variant::ARRAY: return KnitDataType::Array;
+			case Variant::CALLABLE: return KnitDataType::Callable;
+			case Variant::SIGNAL: return KnitDataType::Signal;
 			case Variant::DICTIONARY: return KnitDataType::Dictionary;
+			case Variant::ARRAY: return KnitDataType::Array;
+			case Variant::PACKED_BYTE_ARRAY: return KnitDataType::PackedByteArray;
+			case Variant::PACKED_INT32_ARRAY: return KnitDataType::PackedInt32Array;
+			case Variant::PACKED_INT64_ARRAY: return KnitDataType::PackedInt64Array;
+			case Variant::PACKED_FLOAT32_ARRAY: return KnitDataType::PackedFloat32Array;
+			case Variant::PACKED_FLOAT64_ARRAY: return KnitDataType::PackedFloat64Array;
+			case Variant::PACKED_STRING_ARRAY: return KnitDataType::PackedStringArray;
+			case Variant::PACKED_VECTOR2_ARRAY: return KnitDataType::PackedVector2Array;
+			case Variant::PACKED_VECTOR3_ARRAY: return KnitDataType::PackedVector3Array;
+			case Variant::PACKED_COLOR_ARRAY: return KnitDataType::PackedColorArray;
+			case Variant::PACKED_VECTOR4_ARRAY: return KnitDataType::PackedVector4Array;
 			default: return KnitDataType::Void;
 		}
 	}

@@ -29,6 +29,7 @@ public:
     bool initialize(ID3D12Device* p_device);
     void shutdown();
 
+    bool is_initialized() const { return initialized; }
     bool is_dxr_supported() const { return dxr_supported; }
     bool is_pipeline_ready() const { return rtx_state_object != nullptr && sbt_buffer != nullptr; }
 

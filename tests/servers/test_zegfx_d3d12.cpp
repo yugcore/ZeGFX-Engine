@@ -33,8 +33,8 @@ TEST_CASE("[ZeGFX][D3D12] Render Graph DAG Builder and Resource Barriers") {
 TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
 #ifdef WITH_DX12_BACKEND
     SUBCASE("Pipeline State Manager Initialization") {
-        D3D12PipelineStateManager psoMgr;
-        CHECK_FALSE(psoMgr.is_initialized());
+        zegfx::D3D12PipelineStateManager psoMgr;
+        CHECK(psoMgr.getCachedPipelineCount() == 0);
     }
 
     SUBCASE("GPU Direct Command Signature Manager") {
