@@ -12,14 +12,19 @@
 #include "editor/script/script_editor_base.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
+#include "scene/gui/check_box.h"
+#include "scene/gui/color_picker.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/graph_edit.h"
+#include "scene/gui/graph_frame.h"
 #include "scene/gui/graph_node.h"
 #include "scene/gui/label.h"
 #include "scene/gui/line_edit.h"
 #include "scene/gui/panel_container.h"
 #include "scene/gui/popup_menu.h"
+#include "scene/gui/spin_box.h"
 #include "scene/gui/tree.h"
+#include "scene/resources/style_box_flat.h"
 
 class KnitsEditorBase : public ScriptEditorBase {
 	GDCLASS(KnitsEditorBase, ScriptEditorBase);
@@ -30,6 +35,7 @@ private:
 
 	HBoxContainer *toolbar = nullptr;
 	Button *add_node_btn = nullptr;
+	Button *add_frame_btn = nullptr;
 	Button *compile_btn = nullptr;
 	Label *status_label = nullptr;
 
@@ -46,10 +52,29 @@ private:
 	HashMap<KnitNodeID, Vector<KnitPinID>> input_slot_to_pin;
 	HashMap<KnitNodeID, Vector<KnitPinID>> output_slot_to_pin;
 
+	// Inline editing widgets on unconnected input pins
+	HashMap<KnitPinID, Control *> pin_inline_widgets;
+	HashMap<KnitPinID, KnitNodeID> pin_owner_lookup;
+	HashMap<uint64_t, GraphFrame *> visual_frames;
+
 	void _update_graph_view();
 	void _create_visual_node(const Ref<KnitNode> &p_node);
+	void _create_visual_frame(const KnitCommentBox &p_comment);
+
+	Control *_create_pin_inline_widget(KnitNodeID p_node_id, const KnitPin &p_pin);
+	void _update_pin_widget_visibility(KnitPinID p_pin_id);
+
+	Color _get_category_color(KnitNodeCategory p_category) const;
+	String _get_category_badge(KnitNodeCategory p_category) const;
+	Color _get_pin_color(KnitPinKind p_kind, KnitDataType p_type) const;
+
+	void _on_pin_bool_changed(bool p_val, KnitNodeID p_node_id, KnitPinID p_pin_id);
+	void _on_pin_float_changed(double p_val, KnitNodeID p_node_id, KnitPinID p_pin_id);
+	void _on_pin_string_changed(const String &p_val, KnitNodeID p_node_id, KnitPinID p_pin_id);
+	void _on_pin_color_changed(const Color &p_val, KnitNodeID p_node_id, KnitPinID p_pin_id);
 
 	void _on_add_node_pressed();
+	void _on_add_frame_pressed();
 	void _on_compile_pressed();
 
 	void _on_connection_request(const StringName &p_from, int p_from_slot, const StringName &p_to, int p_to_slot);
@@ -64,8 +89,6 @@ private:
 	void _on_search_text_changed(const String &p_text);
 	void _spawn_selected_palette_node();
 
-	Color _get_pin_color(KnitPinKind p_kind, KnitDataType p_type) const;
-
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();
@@ -79,6 +102,9 @@ public:
 
 	virtual void set_edited_resource(const Ref<Resource> &p_res) override;
 	virtual Ref<Resource> get_edited_resource() const override { return edited_res; }
+
+	virtual Control *get_base_editor() const override { return (Control *)graph_edit; }
+	virtual Ref<Texture2D> get_theme_icon() override;
 
 	virtual void apply_code() override;
 	virtual void validate_script() override;

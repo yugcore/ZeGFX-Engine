@@ -10,14 +10,17 @@
 #include "../knits_script.h"
 #include "editor/script/script_editor_plugin.h"
 
+#include "editor/docks/editor_dock_manager.h"
+
 bool KnitsEditorPlugin::handles(Object *p_object) const {
 	return Object::cast_to<KnitsScript>(p_object) != nullptr || Object::cast_to<KnitsGraph>(p_object) != nullptr;
 }
 
 void KnitsEditorPlugin::edit(Object *p_object) {
 	Ref<Resource> res = Object::cast_to<Resource>(p_object);
-	if (res.is_valid()) {
+	if (res.is_valid() && ScriptEditor::get_singleton()) {
 		ScriptEditor::get_singleton()->edit(res);
+		EditorDockManager::get_singleton()->focus_dock(ScriptEditor::get_singleton());
 	}
 }
 

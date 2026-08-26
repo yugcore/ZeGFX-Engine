@@ -21,6 +21,53 @@ ScriptEditorBase *KnitsEditorBase::create_editor(const Ref<Resource> &p_resource
 	return nullptr;
 }
 
+Color KnitsEditorBase::_get_category_color(KnitNodeCategory p_category) const {
+	switch (p_category) {
+		case KnitNodeCategory::Event:
+			return Color(0.68f, 0.15f, 0.22f); // Ruby Crimson
+		case KnitNodeCategory::ImpureAction:
+			return Color(0.16f, 0.38f, 0.82f); // Velvet Blue
+		case KnitNodeCategory::PureFunction:
+			return Color(0.10f, 0.52f, 0.34f); // Emerald
+		case KnitNodeCategory::FlowControl:
+			return Color(0.26f, 0.32f, 0.42f); // Slate Navy
+		case KnitNodeCategory::VariableGet:
+		case KnitNodeCategory::VariableSet:
+			return Color(0.10f, 0.48f, 0.54f); // Teal Cyan
+		case KnitNodeCategory::SubGraph:
+			return Color(0.50f, 0.22f, 0.72f); // Royal Purple
+		case KnitNodeCategory::Reroute:
+			return Color(0.35f, 0.35f, 0.35f);
+		case KnitNodeCategory::Comment:
+			return Color(0.22f, 0.26f, 0.32f);
+		default:
+			return Color(0.28f, 0.34f, 0.40f);
+	}
+}
+
+String KnitsEditorBase::_get_category_badge(KnitNodeCategory p_category) const {
+	switch (p_category) {
+		case KnitNodeCategory::Event:
+			return "[Event] ";
+		case KnitNodeCategory::ImpureAction:
+			return "[Action] ";
+		case KnitNodeCategory::PureFunction:
+			return "[Math] ";
+		case KnitNodeCategory::FlowControl:
+			return "[Flow] ";
+		case KnitNodeCategory::VariableGet:
+			return "[Get] ";
+		case KnitNodeCategory::VariableSet:
+			return "[Set] ";
+		case KnitNodeCategory::SubGraph:
+			return "[Macro] ";
+		case KnitNodeCategory::Comment:
+			return "[Frame] ";
+		default:
+			return "";
+	}
+}
+
 Color KnitsEditorBase::_get_pin_color(KnitPinKind p_kind, KnitDataType p_type) const {
 	if (p_kind == KnitPinKind::Execution) {
 		return Color(1.0f, 1.0f, 1.0f); // White execution wire
@@ -44,14 +91,215 @@ Color KnitsEditorBase::_get_pin_color(KnitPinKind p_kind, KnitDataType p_type) c
 	}
 }
 
+Control *KnitsEditorBase::_create_pin_inline_widget(KnitNodeID p_node_id, const KnitPin &p_pin) {
+	if (p_pin.kind != KnitPinKind::Data) {
+		return nullptr;
+	}
+
+	switch (p_pin.type.kind) {
+		case KnitDataType::Bool: {
+			CheckBox *cb = memnew(CheckBox);
+			cb->set_pressed(p_pin.default_value.booleanize());
+			cb->set_focus_mode(Control::FOCUS_CLICK);
+			cb->connect("toggled", callable_mp(this, &KnitsEditorBase::_on_pin_bool_changed).bind(p_node_id, p_pin.id));
+			return cb;
+		}
+		case KnitDataType::Float:
+		case KnitDataType::Double: {
+			SpinBox *sb = memnew(SpinBox);
+			sb->set_step(0.01);
+			sb->set_min(-999999.0);
+			sb->set_max(999999.0);
+			sb->set_allow_greater(true);
+			sb->set_allow_lesser(true);
+			sb->set_custom_minimum_size(Size2(64, 0));
+			double val = (p_pin.default_value.get_type() == Variant::FLOAT || p_pin.default_value.get_type() == Variant::INT) ? (double)p_pin.default_value : 0.0;
+			sb->set_value(val);
+			sb->connect("value_changed", callable_mp(this, &KnitsEditorBase::_on_pin_float_changed).bind(p_node_id, p_pin.id));
+			return sb;
+		}
+		case KnitDataType::Int32:
+		case KnitDataType::Int64: {
+			SpinBox *sb = memnew(SpinBox);
+			sb->set_step(1.0);
+			sb->set_min(-999999);
+			sb->set_max(999999);
+			sb->set_allow_greater(true);
+			sb->set_allow_lesser(true);
+			sb->set_custom_minimum_size(Size2(56, 0));
+			int64_t val = (p_pin.default_value.get_type() == Variant::INT || p_pin.default_value.get_type() == Variant::FLOAT) ? (int64_t)p_pin.default_value : 0;
+			sb->set_value((double)val);
+			sb->connect("value_changed", callable_mp(this, &KnitsEditorBase::_on_pin_float_changed).bind(p_node_id, p_pin.id));
+			return sb;
+		}
+		case KnitDataType::String:
+		case KnitDataType::StringName:
+		case KnitDataType::NodePath: {
+			LineEdit *le = memnew(LineEdit);
+			le->set_custom_minimum_size(Size2(72, 0));
+			le->set_placeholder("value");
+			String val = (p_pin.default_value.get_type() == Variant::STRING || p_pin.default_value.get_type() == Variant::STRING_NAME) ? String(p_pin.default_value) : "";
+			le->set_text(val);
+			le->connect("text_changed", callable_mp(this, &KnitsEditorBase::_on_pin_string_changed).bind(p_node_id, p_pin.id));
+			return le;
+		}
+		case KnitDataType::Color: {
+			ColorPickerButton *cpb = memnew(ColorPickerButton);
+			cpb->set_custom_minimum_size(Size2(28, 20));
+			Color col = p_pin.default_value.get_type() == Variant::COLOR ? (Color)p_pin.default_value : Color(1, 1, 1, 1);
+			cpb->set_pick_color(col);
+			cpb->connect("color_changed", callable_mp(this, &KnitsEditorBase::_on_pin_color_changed).bind(p_node_id, p_pin.id));
+			return cpb;
+		}
+		default:
+			return nullptr;
+	}
+}
+
+void KnitsEditorBase::_on_pin_bool_changed(bool p_val, KnitNodeID p_node_id, KnitPinID p_pin_id) {
+	if (graph.is_null() || !graph->nodes.has(p_node_id)) return;
+	Ref<KnitNode> node = graph->nodes[p_node_id];
+	if (node.is_null()) return;
+	KnitPin *pin = node->find_pin(p_pin_id);
+	if (pin) {
+		pin->default_value = p_val;
+		apply_code();
+	}
+}
+
+void KnitsEditorBase::_on_pin_float_changed(double p_val, KnitNodeID p_node_id, KnitPinID p_pin_id) {
+	if (graph.is_null() || !graph->nodes.has(p_node_id)) return;
+	Ref<KnitNode> node = graph->nodes[p_node_id];
+	if (node.is_null()) return;
+	KnitPin *pin = node->find_pin(p_pin_id);
+	if (pin) {
+		if (pin->type.kind == KnitDataType::Int32 || pin->type.kind == KnitDataType::Int64) {
+			pin->default_value = (int64_t)p_val;
+		} else {
+			pin->default_value = p_val;
+		}
+		apply_code();
+	}
+}
+
+void KnitsEditorBase::_on_pin_string_changed(const String &p_val, KnitNodeID p_node_id, KnitPinID p_pin_id) {
+	if (graph.is_null() || !graph->nodes.has(p_node_id)) return;
+	Ref<KnitNode> node = graph->nodes[p_node_id];
+	if (node.is_null()) return;
+	KnitPin *pin = node->find_pin(p_pin_id);
+	if (pin) {
+		if (pin->type.kind == KnitDataType::StringName) {
+			pin->default_value = StringName(p_val);
+		} else if (pin->type.kind == KnitDataType::NodePath) {
+			pin->default_value = NodePath(p_val);
+		} else {
+			pin->default_value = p_val;
+		}
+		apply_code();
+	}
+}
+
+void KnitsEditorBase::_on_pin_color_changed(const Color &p_val, KnitNodeID p_node_id, KnitPinID p_pin_id) {
+	if (graph.is_null() || !graph->nodes.has(p_node_id)) return;
+	Ref<KnitNode> node = graph->nodes[p_node_id];
+	if (node.is_null()) return;
+	KnitPin *pin = node->find_pin(p_pin_id);
+	if (pin) {
+		pin->default_value = p_val;
+		apply_code();
+	}
+}
+
+void KnitsEditorBase::_update_pin_widget_visibility(KnitPinID p_pin_id) {
+	if (!pin_inline_widgets.has(p_pin_id)) return;
+	Control *widget = pin_inline_widgets[p_pin_id];
+	if (!widget) return;
+	bool is_connected = (graph.is_valid() && graph->get_connection_for_input_pin(p_pin_id) != nullptr);
+	widget->set_visible(!is_connected);
+}
+
+void KnitsEditorBase::_create_visual_frame(const KnitCommentBox &p_comment) {
+	GraphFrame *frame = memnew(GraphFrame);
+	frame->set_name("frame_" + itos((uint64_t)p_comment.id));
+	frame->set_title(p_comment.title);
+	frame->set_position_offset(p_comment.bounds.position);
+	frame->set_size(p_comment.bounds.size);
+	frame->set_tint_color_enabled(true);
+	frame->set_tint_color(p_comment.color);
+	frame->set_resizable(true);
+
+	Ref<StyleBoxFlat> frame_sb = memnew(StyleBoxFlat);
+	frame_sb->set_bg_color(p_comment.color);
+	frame_sb->set_border_width_all(2);
+	frame_sb->set_border_color(p_comment.color.lightened(0.3f));
+	frame_sb->set_corner_radius_all(8);
+	frame->add_theme_style_override("panel", frame_sb);
+
+	visual_frames[p_comment.id] = frame;
+	graph_edit->add_child(frame);
+}
+
 void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 	if (p_node.is_null()) return;
 
 	GraphNode *gn = memnew(GraphNode);
 	gn->set_name("node_" + itos((uint64_t)p_node->id));
-	gn->set_title(p_node->title);
+	gn->set_title(_get_category_badge(p_node->category) + p_node->title);
 	gn->set_position_offset(p_node->position);
 	gn->set_resizable(false);
+
+	Color cat_col = _get_category_color(p_node->category);
+
+	// Custom Category Theming StyleBoxes
+	Ref<StyleBoxFlat> titlebar_sb = memnew(StyleBoxFlat);
+	titlebar_sb->set_bg_color(cat_col);
+	titlebar_sb->set_corner_radius(CORNER_TOP_LEFT, 6);
+	titlebar_sb->set_corner_radius(CORNER_TOP_RIGHT, 6);
+	titlebar_sb->set_corner_radius(CORNER_BOTTOM_LEFT, 0);
+	titlebar_sb->set_corner_radius(CORNER_BOTTOM_RIGHT, 0);
+	titlebar_sb->set_content_margin_all(6);
+	gn->add_theme_style_override("titlebar", titlebar_sb);
+
+	Ref<StyleBoxFlat> titlebar_sel_sb = memnew(StyleBoxFlat);
+	titlebar_sel_sb->set_bg_color(cat_col.lightened(0.15f));
+	titlebar_sel_sb->set_corner_radius(CORNER_TOP_LEFT, 6);
+	titlebar_sel_sb->set_corner_radius(CORNER_TOP_RIGHT, 6);
+	titlebar_sel_sb->set_corner_radius(CORNER_BOTTOM_LEFT, 0);
+	titlebar_sel_sb->set_corner_radius(CORNER_BOTTOM_RIGHT, 0);
+	titlebar_sel_sb->set_border_width(SIDE_TOP, 2);
+	titlebar_sel_sb->set_border_width(SIDE_LEFT, 2);
+	titlebar_sel_sb->set_border_width(SIDE_RIGHT, 2);
+	titlebar_sel_sb->set_border_color(Color(1.0f, 0.85f, 0.35f));
+	titlebar_sel_sb->set_content_margin_all(6);
+	gn->add_theme_style_override("titlebar_selected", titlebar_sel_sb);
+
+	Ref<StyleBoxFlat> panel_sb = memnew(StyleBoxFlat);
+	panel_sb->set_bg_color(Color(0.09f, 0.10f, 0.13f, 0.94f));
+	panel_sb->set_border_width_all(1);
+	panel_sb->set_border_color(cat_col.darkened(0.2f));
+	panel_sb->set_corner_radius(CORNER_TOP_LEFT, 0);
+	panel_sb->set_corner_radius(CORNER_TOP_RIGHT, 0);
+	panel_sb->set_corner_radius(CORNER_BOTTOM_LEFT, 6);
+	panel_sb->set_corner_radius(CORNER_BOTTOM_RIGHT, 6);
+	panel_sb->set_shadow_color(Color(0.0f, 0.0f, 0.0f, 0.45f));
+	panel_sb->set_shadow_size(6);
+	panel_sb->set_shadow_offset(Vector2(0, 3));
+	panel_sb->set_content_margin_all(6);
+	gn->add_theme_style_override("panel", panel_sb);
+
+	Ref<StyleBoxFlat> panel_sel_sb = memnew(StyleBoxFlat);
+	panel_sel_sb->set_bg_color(Color(0.11f, 0.12f, 0.16f, 0.96f));
+	panel_sel_sb->set_border_width_all(2);
+	panel_sel_sb->set_border_color(Color(1.0f, 0.85f, 0.35f));
+	panel_sel_sb->set_corner_radius(CORNER_TOP_LEFT, 0);
+	panel_sel_sb->set_corner_radius(CORNER_TOP_RIGHT, 0);
+	panel_sel_sb->set_corner_radius(CORNER_BOTTOM_LEFT, 6);
+	panel_sel_sb->set_corner_radius(CORNER_BOTTOM_RIGHT, 6);
+	panel_sel_sb->set_shadow_color(Color(0.0f, 0.0f, 0.0f, 0.6f));
+	panel_sel_sb->set_shadow_size(10);
+	panel_sel_sb->set_shadow_offset(Vector2(0, 4));
+	panel_sel_sb->set_content_margin_all(6);
+	gn->add_theme_style_override("panel_selected", panel_sel_sb);
 
 	visual_nodes[p_node->id] = gn;
 	node_id_lookup[gn] = p_node->id;
@@ -63,8 +311,10 @@ void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 	if (max_slots == 0) max_slots = 1;
 
 	for (int i = 0; i < max_slots; i++) {
-		Label *slot_label = memnew(Label);
-		gn->add_child(slot_label);
+		HBoxContainer *slot_row = memnew(HBoxContainer);
+		slot_row->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		slot_row->set_custom_minimum_size(Size2(0, 24));
+		gn->add_child(slot_row);
 
 		bool has_left = i < p_node->input_pins.size();
 		bool has_right = i < p_node->output_pins.size();
@@ -75,9 +325,35 @@ void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 			const KnitPin &pin = p_node->input_pins[i];
 			left_type = (pin.kind == KnitPinKind::Execution) ? 0 : (int)pin.type.kind;
 			left_col = _get_pin_color(pin.kind, pin.type.kind);
+
+			HBoxContainer *left_box = memnew(HBoxContainer);
+			left_box->set_alignment(BoxContainer::ALIGNMENT_BEGIN);
+			slot_row->add_child(left_box);
+
+			Label *slot_label = memnew(Label);
 			slot_label->set_text(pin.display_label);
+			slot_label->add_theme_color_override("font_color", left_col.lerp(Color(1, 1, 1), 0.35f));
+			left_box->add_child(slot_label);
+
+			if (pin.kind == KnitPinKind::Data) {
+				Control *widget = _create_pin_inline_widget(p_node->id, pin);
+				if (widget) {
+					left_box->add_child(widget);
+					pin_inline_widgets[pin.id] = widget;
+					pin_owner_lookup[pin.id] = p_node->id;
+					bool is_conn = (graph.is_valid() && graph->get_connection_for_input_pin(pin.id) != nullptr);
+					widget->set_visible(!is_conn);
+				}
+			}
+
 			in_pins.push_back(pin.id);
 		}
+
+		// Center spacer
+		Control *spacer = memnew(Control);
+		spacer->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		spacer->set_custom_minimum_size(Size2(16, 0));
+		slot_row->add_child(spacer);
 
 		int right_type = 0;
 		Color right_col = Color(1, 1, 1);
@@ -85,12 +361,17 @@ void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 			const KnitPin &pin = p_node->output_pins[i];
 			right_type = (pin.kind == KnitPinKind::Execution) ? 0 : (int)pin.type.kind;
 			right_col = _get_pin_color(pin.kind, pin.type.kind);
-			if (has_left) {
-				slot_label->set_text(slot_label->get_text() + "        " + pin.display_label);
-			} else {
-				slot_label->set_text(pin.display_label);
-				slot_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_RIGHT);
-			}
+
+			HBoxContainer *right_box = memnew(HBoxContainer);
+			right_box->set_alignment(BoxContainer::ALIGNMENT_END);
+			slot_row->add_child(right_box);
+
+			Label *slot_label = memnew(Label);
+			slot_label->set_text(pin.display_label);
+			slot_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_RIGHT);
+			slot_label->add_theme_color_override("font_color", right_col.lerp(Color(1, 1, 1), 0.35f));
+			right_box->add_child(slot_label);
+
 			out_pins.push_back(pin.id);
 		}
 
@@ -104,10 +385,13 @@ void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 }
 
 void KnitsEditorBase::_update_graph_view() {
+	if (graph_edit == nullptr) return;
+
 	graph_edit->clear_connections();
 
 	for (KeyValue<KnitNodeID, GraphNode *> &E : visual_nodes) {
 		if (E.value && E.value->get_parent() == graph_edit) {
+			graph_edit->remove_child(E.value);
 			memdelete(E.value);
 		}
 	}
@@ -116,10 +400,24 @@ void KnitsEditorBase::_update_graph_view() {
 	input_slot_to_pin.clear();
 	output_slot_to_pin.clear();
 
+	for (KeyValue<uint64_t, GraphFrame *> &E : visual_frames) {
+		if (E.value && E.value->get_parent() == graph_edit) {
+			graph_edit->remove_child(E.value);
+			memdelete(E.value);
+		}
+	}
+	visual_frames.clear();
+	pin_inline_widgets.clear();
+	pin_owner_lookup.clear();
+
 	if (graph.is_null()) return;
 
 	for (const KeyValue<KnitNodeID, Ref<KnitNode>> &E : graph->nodes) {
 		_create_visual_node(E.value);
+	}
+
+	for (int i = 0; i < graph->comments.size(); i++) {
+		_create_visual_frame(graph->comments[i]);
 	}
 
 	for (int i = 0; i < graph->connections.size(); i++) {
@@ -149,6 +447,11 @@ void KnitsEditorBase::_update_graph_view() {
 			graph_edit->connect_node(from_gn->get_name(), from_slot, to_gn->get_name(), to_slot);
 		}
 	}
+
+	// Update inline widget visibility
+	for (const KeyValue<KnitPinID, Control *> &E : pin_inline_widgets) {
+		_update_pin_widget_visibility(E.key);
+	}
 }
 
 void KnitsEditorBase::_on_connection_request(const StringName &p_from, int p_from_slot, const StringName &p_to, int p_to_slot) {
@@ -169,6 +472,7 @@ void KnitsEditorBase::_on_connection_request(const StringName &p_from, int p_fro
 	KnitConnectionID cid = graph->connect_pins(from_id, from_pin, to_id, to_pin);
 	if (cid != 0) {
 		graph_edit->connect_node(p_from, p_from_slot, p_to, p_to_slot);
+		_update_pin_widget_visibility(to_pin);
 		apply_code();
 		status_label->set_text("Connected pin!");
 	} else {
@@ -193,6 +497,7 @@ void KnitsEditorBase::_on_disconnection_request(const StringName &p_from, int p_
 
 	graph->disconnect_pins(from_pin, to_pin);
 	graph_edit->disconnect_node(p_from, p_from_slot, p_to, p_to_slot);
+	_update_pin_widget_visibility(to_pin);
 	apply_code();
 	status_label->set_text("Disconnected pin.");
 }
@@ -225,6 +530,15 @@ void KnitsEditorBase::_on_popup_request(const Vector2 &p_position) {
 
 void KnitsEditorBase::_on_add_node_pressed() {
 	_on_popup_request(Vector2(200, 200));
+}
+
+void KnitsEditorBase::_on_add_frame_pressed() {
+	if (graph.is_null()) return;
+	Rect2 bounds(Vector2(200, 200), Size2(320, 200));
+	graph->add_comment_box("Comment Frame", bounds, Color(0.18f, 0.22f, 0.28f, 0.45f));
+	_update_graph_view();
+	apply_code();
+	status_label->set_text("Added Comment Frame.");
 }
 
 void KnitsEditorBase::_populate_palette_tree(const String &p_filter) {
@@ -820,9 +1134,9 @@ void KnitsEditorBase::validate_script() {
 	KnitCompiledGraph compiled;
 	String error;
 	if (compiler.compile(graph, compiled, error)) {
-		status_label->set_text("✅ Graph Compiled Successfully!");
+		status_label->set_text("Graph Compiled Successfully!");
 	} else {
-		status_label->set_text(vformat("❌ Error: %s", error));
+		status_label->set_text(vformat("Error: %s", error));
 	}
 }
 
@@ -830,9 +1144,18 @@ bool KnitsEditorBase::is_unsaved() {
 	return false;
 }
 
+Ref<Texture2D> KnitsEditorBase::get_theme_icon() {
+	if (is_inside_tree()) {
+		return get_editor_theme_icon(SNAME("VisualScript"));
+	}
+	return Ref<Texture2D>();
+}
+
 void KnitsEditorBase::_notification(int p_what) {
 	if (p_what == NOTIFICATION_READY) {
-		_update_graph_view();
+		if (visual_nodes.is_empty() && graph.is_valid()) {
+			_update_graph_view();
+		}
 	}
 }
 
@@ -848,8 +1171,13 @@ KnitsEditorBase::KnitsEditorBase() {
 	add_node_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_add_node_pressed));
 	toolbar->add_child(add_node_btn);
 
+	add_frame_btn = memnew(Button);
+	add_frame_btn->set_text("+ Frame");
+	add_frame_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_add_frame_pressed));
+	toolbar->add_child(add_frame_btn);
+
 	compile_btn = memnew(Button);
-	compile_btn->set_text("⚡ Compile");
+	compile_btn->set_text("Compile");
 	compile_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_compile_pressed));
 	toolbar->add_child(compile_btn);
 
@@ -864,6 +1192,10 @@ KnitsEditorBase::KnitsEditorBase() {
 	graph_edit->set_snapping_enabled(true);
 	graph_edit->set_snapping_distance(16);
 	graph_edit->set_show_grid(true);
+	graph_edit->set_minimap_enabled(true);
+	graph_edit->set_connection_lines_curvature(0.5f);
+	graph_edit->set_connection_lines_thickness(3.0f);
+	graph_edit->set_connection_lines_antialiased(true);
 	graph_edit->connect("connection_request", callable_mp(this, &KnitsEditorBase::_on_connection_request));
 	graph_edit->connect("disconnection_request", callable_mp(this, &KnitsEditorBase::_on_disconnection_request));
 	graph_edit->connect("delete_nodes_request", callable_mp(this, &KnitsEditorBase::_on_delete_nodes_request));
