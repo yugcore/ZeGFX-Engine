@@ -36,7 +36,6 @@ public:
 	virtual Vector<ScriptTemplate> get_built_in_templates(const StringName &p_object) override { return Vector<ScriptTemplate>(); }
 	virtual bool is_using_templates() override { return false; }
 
-	virtual bool validate(const String &p_script, const String &p_path = "", List<String> *r_functions = nullptr, List<ScriptError> *r_errors = nullptr, List<Warning> *r_warnings = nullptr, HashSet<int> *r_safe_lines = nullptr) const override { return true; }
 	virtual String make_function(const String &p_class, const String &p_name, const PackedStringArray &p_args) const override { return ""; }
 	virtual bool supports_builtin_mode() const override { return false; }
 	virtual bool supports_documentation() const override { return true; }
@@ -45,7 +44,6 @@ public:
 	virtual bool handles_global_class_type(const String &p_type) const override { return p_type == "KnitsScript"; }
 	virtual String get_global_class_name(const String &p_path, String *r_base_type = nullptr, String *r_icon_path = nullptr, bool *r_is_abstract = nullptr, bool *r_is_tool = nullptr) const override { return String(); }
 
-	virtual void auto_indent_code(String &p_code, int p_from_line, int p_to_line) const override {}
 	virtual void add_global_constant(const StringName &p_variable, const Variant &p_value) override {}
 
 	/* DEBUGGER FUNCTIONS */
@@ -64,10 +62,6 @@ public:
 	virtual void reload_tool_script(const Ref<Script> &p_script) override {}
 
 	/* LOADER FUNCTIONS */
-	virtual void get_recognized_extensions(List<String> *p_extensions) const override {
-		p_extensions->push_back("knit");
-		p_extensions->push_back("knit_macro");
-	}
 	virtual void get_public_functions(List<MethodInfo> *p_functions) const override {}
 	virtual void get_public_constants(List<Pair<String, Variant>> *p_constants) const override {}
 	virtual void get_public_annotations(List<MethodInfo> *p_annotations) const override {}
