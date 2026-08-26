@@ -474,8 +474,10 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 
 	// Editor
 	EDITOR_SETTING(Variant::BOOL, PROPERTY_HINT_NONE, "interface/editor/localization/localize_settings", true, "")
-	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_ENUM, "interface/editor/docks/dock_tab_style", 0, "Text Only,Icon Only,Text and Icon")
-	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_ENUM, "interface/editor/docks/bottom_dock_tab_style", 0, "Text Only,Icon Only,Text and Icon")
+	const String dock_tab_style_hint = "Text Only,Icon Only,Text and Icon";
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_ENUM, "interface/editor/docks/dock_tab_style", 0, dock_tab_style_hint)
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_ENUM, "interface/editor/docks/bottom_dock_tab_style", 0, dock_tab_style_hint)
+	EDITOR_SETTING_BASIC(Variant::INT, PROPERTY_HINT_ENUM, "interface/editor/docks/main_screen_dock_tab_style", 2, dock_tab_style_hint)
 	EDITOR_SETTING_USAGE(Variant::INT, PROPERTY_HINT_ENUM, "interface/editor/localization/ui_layout_direction", 0, "Based on Application Locale,Left-to-Right,Right-to-Left,Based on System Locale", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_RESTART_IF_CHANGED)
 
 	// Display what the Auto display scale setting effectively corresponds to.
@@ -1357,6 +1359,7 @@ void EditorSettings::_handle_setting_compatibility() {
 	_rename_shortcut("script_editor/window_move_up", "script_editor/move_document_up");
 	_rename_shortcut("script_editor/window_move_down", "script_editor/move_document_down");
 	_rename_shortcut("script_editor/window_sort", "script_editor/sort_documents");
+	_rename_shortcut("script_text_editor/replace_in_files", "editor/replace_in_files");
 }
 
 void EditorSettings::_rename_setting(const String &p_old_name, const String &p_new_name) {

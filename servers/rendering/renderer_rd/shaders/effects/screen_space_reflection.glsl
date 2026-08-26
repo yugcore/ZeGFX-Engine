@@ -137,7 +137,7 @@ void main() {
 		pos += geom_normal * (1.0 - pow(clamp(dot(normal, geom_normal), 0.0, 1.0), 8.0));
 		screen_pos = compute_screen_pos(pos);
 
-		vec3 view_dir = params.orthogonal ? vec3(0.0, 0.0, -1.0) : normalize(pos + scene_data.eye_offset[params.view_index].xyz);
+		vec3 view_dir = params.orthogonal ? vec3(0.0, 0.0, -1.0) : normalize(pos - scene_data.eye_offset[params.view_index].xyz);
 
 		// ZeGFX GGX Microfacet Reflection Ray Perturbation
 		vec3 micro_normal = normal;

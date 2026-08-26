@@ -111,7 +111,7 @@ void InspectorDock::_menu_option_confirm(int p_option, bool p_confirmed) {
 
 		case OBJECT_REQUEST_HELP: {
 			if (current) {
-				EditorNode::get_singleton()->get_editor_main_screen()->select(EditorMainScreen::EDITOR_SCRIPT);
+				ScriptEditor::get_singleton()->focus_editor();
 				emit_signal(SNAME("request_help"), current->get_class());
 			}
 		} break;
@@ -379,7 +379,7 @@ void InspectorDock::_select_history(int p_idx) {
 	EditorNode::get_singleton()->push_item(obj);
 
 	if (const EditorDebuggerRemoteObjects *robjs = Object::cast_to<EditorDebuggerRemoteObjects>(obj)) {
-		EditorDebuggerNode::get_singleton()->set_remote_selection(robjs->remote_object_ids.duplicate());
+		EditorDebuggerNode::get_singleton()->set_remote_selection(robjs->remote_object_ids, robjs->debugger_id);
 	}
 }
 
@@ -422,7 +422,7 @@ void InspectorDock::_edit_forward() {
 		EditorNode::get_singleton()->edit_current();
 
 		if (const EditorDebuggerRemoteObjects *robjs = Object::cast_to<EditorDebuggerRemoteObjects>(current)) {
-			EditorDebuggerNode::get_singleton()->set_remote_selection(robjs->remote_object_ids.duplicate());
+			EditorDebuggerNode::get_singleton()->set_remote_selection(robjs->remote_object_ids, robjs->debugger_id);
 		}
 	}
 }
@@ -433,7 +433,7 @@ void InspectorDock::_edit_back_pressed() {
 		EditorNode::get_singleton()->edit_current();
 
 		if (const EditorDebuggerRemoteObjects *robjs = Object::cast_to<EditorDebuggerRemoteObjects>(current)) {
-			EditorDebuggerNode::get_singleton()->set_remote_selection(robjs->remote_object_ids.duplicate());
+			EditorDebuggerNode::get_singleton()->set_remote_selection(robjs->remote_object_ids, robjs->debugger_id);
 		}
 	}
 }

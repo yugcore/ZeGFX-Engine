@@ -6011,6 +6011,8 @@ void GLTFDocument::_convert_mesh_instances(Ref<GLTFState> p_state) {
 					if (bind_name == StringName()) {
 						bind_name = godot_skeleton->get_bone_name(bone_i);
 					}
+					Vector3 skin_scale = godot_skeleton->get_bone_skin_scale(bone_i);
+					bind_pose = bind_pose.scaled(skin_scale);
 					GLTFNodeIndex skeleton_bone_i = gltf_skeleton->joints[bone_i];
 					gltf_skin->joints_original.push_back(skeleton_bone_i);
 					gltf_skin->joints.push_back(skeleton_bone_i);
@@ -7237,11 +7239,8 @@ Error GLTFDocument::write_to_filesystem(Ref<GLTFState> p_state, const String &p_
 	ERR_FAIL_COND_V(p_state.is_null(), ERR_INVALID_PARAMETER);
 	p_state->set_base_path(p_path.get_base_dir());
 	p_state->filename = p_path.get_file();
-	Error err = _serialize(p_state);
-	if (err != OK) {
-		return err;
-	}
-	err = _serialize_file(p_state, p_path);
+	RETURN_IF_ERROR(_serialize(p_state));
+	Error err = _serialize_file(p_state, p_path);
 	if (err != OK) {
 		return Error::FAILED;
 	}
