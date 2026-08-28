@@ -5,6 +5,7 @@ Import("env")
 Import("env_modules")
 
 env_knits = env_modules.Clone()
+env_knits.Prepend(CPPPATH=["#modules/gdscript"])
 env_knits.add_source_files(env.modules_sources, "*.cpp")
 
 if env.editor_build:

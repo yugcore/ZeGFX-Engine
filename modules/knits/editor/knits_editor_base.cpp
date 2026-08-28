@@ -7,6 +7,7 @@
 #include "knits_editor_base.h"
 #include "../knits_compiler.h"
 #include "../knits_serializer.h"
+#include "../knits_gdscript_transpiler.h"
 #include "core/object/callable_mp.h"
 #include "editor/editor_node.h"
 #include "editor/themes/editor_scale.h"
@@ -569,6 +570,40 @@ void KnitsEditorBase::_on_popup_request(const Vector2 &p_position) {
 
 void KnitsEditorBase::_on_add_node_pressed() {
 	_on_popup_request(Vector2(200, 200));
+}
+
+void KnitsEditorBase::_on_export_gdscript_pressed() {
+	if (graph.is_null()) return;
+	String code;
+	String error;
+	if (KnitsGDScriptTranspiler::knit_graph_to_gdscript(graph, code, error)) {
+		export_text_edit->set_text(code);
+		export_dialog->popup_centered(Size2(640, 480));
+		status_label->set_text("Exported graph to GDScript preview.");
+	} else {
+		status_label->set_text(vformat("Export error: %s", error));
+	}
+}
+
+void KnitsEditorBase::_on_import_gdscript_pressed() {
+	import_text_edit->clear();
+	import_dialog->popup_centered(Size2(640, 480));
+	import_text_edit->grab_focus();
+}
+
+void KnitsEditorBase::_on_import_dialog_confirmed() {
+	if (graph.is_null()) {
+		graph.instantiate();
+	}
+	String code = import_text_edit->get_text();
+	String error;
+	if (KnitsGDScriptTranspiler::gdscript_to_knit_graph(code, graph, error)) {
+		_update_graph_view();
+		apply_code();
+		status_label->set_text("Successfully converted GDScript to KnitNodes graph!");
+	} else {
+		status_label->set_text(vformat("Import error: %s", error));
+	}
 }
 
 void KnitsEditorBase::_on_add_frame_pressed() {
@@ -1893,10 +1928,51 @@ KnitsEditorBase::KnitsEditorBase() {
 	compile_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_compile_pressed));
 	toolbar->add_child(compile_btn);
 
+	export_gdscript_btn = memnew(Button);
+	export_gdscript_btn->set_text("Export GDScript");
+	export_gdscript_btn->set_flat(true);
+	export_gdscript_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_export_gdscript_pressed));
+	toolbar->add_child(export_gdscript_btn);
+
+	import_gdscript_btn = memnew(Button);
+	import_gdscript_btn->set_text("Import GDScript");
+	import_gdscript_btn->set_flat(true);
+	import_gdscript_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_import_gdscript_pressed));
+	toolbar->add_child(import_gdscript_btn);
+
 	status_label = memnew(Label);
 	status_label->set_text("Ready");
 	status_label->set_h_size_flags(SIZE_EXPAND_FILL);
 	toolbar->add_child(status_label);
+
+	// Export Dialog
+	export_dialog = memnew(AcceptDialog);
+	export_dialog->set_title("Generated GDScript Code Preview");
+	VBoxContainer *exp_vbox = memnew(VBoxContainer);
+	export_dialog->add_child(exp_vbox);
+	export_text_edit = memnew(TextEdit);
+	export_text_edit->set_v_size_flags(SIZE_EXPAND_FILL);
+	export_text_edit->set_h_size_flags(SIZE_EXPAND_FILL);
+	export_text_edit->set_custom_minimum_size(Size2(560, 380));
+	export_text_edit->set_editable(false);
+	exp_vbox->add_child(export_text_edit);
+	add_child(export_dialog);
+
+	// Import Dialog
+	import_dialog = memnew(ConfirmationDialog);
+	import_dialog->set_title("Import GDScript to KnitGraph");
+	VBoxContainer *imp_vbox = memnew(VBoxContainer);
+	import_dialog->add_child(imp_vbox);
+	Label *imp_lbl = memnew(Label);
+	imp_lbl->set_text("Paste GDScript code below to convert into a visual KnitGraph:");
+	imp_vbox->add_child(imp_lbl);
+	import_text_edit = memnew(TextEdit);
+	import_text_edit->set_v_size_flags(SIZE_EXPAND_FILL);
+	import_text_edit->set_h_size_flags(SIZE_EXPAND_FILL);
+	import_text_edit->set_custom_minimum_size(Size2(560, 380));
+	imp_vbox->add_child(import_text_edit);
+	import_dialog->connect("confirmed", callable_mp(this, &KnitsEditorBase::_on_import_dialog_confirmed));
+	add_child(import_dialog);
 
 	graph_edit = memnew(GraphEdit);
 	graph_edit->set_v_size_flags(SIZE_EXPAND_FILL);

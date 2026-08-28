@@ -10,6 +10,7 @@
 #include "../knits_script.h"
 #include "../knits_types.h"
 #include "../knits_vm.h"
+#include "../knits_gdscript_transpiler.h"
 
 #include "tests/test_macros.h"
 
@@ -954,13 +955,68 @@ TEST_CASE("[Knits] Character Move & Jump 3D and Raycast Query 3D compilation") {
 	KnitCompiledGraph compiled;
 	String error;
 	bool ok = compiler.compile(graph, compiled, error);
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(bool(return_val) == false);
+}
+
+TEST_CASE("[Knits] 1-Click GDScript to KnitGraph AST transpilation and execution") {
+	String gd_source = 
+		"func _ready():\n"
+		"\tvar x = 10\n"
+		"\tif true:\n"
+		"\t\treturn 42.0\n"
+		"\telse:\n"
+		"\t\treturn 0.0\n";
+
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	String error;
+	bool ok = KnitsGDScriptTranspiler::gdscript_to_knit_graph(gd_source, graph, error);
+	CHECK(ok);
+	CHECK(graph->nodes.size() >= 3);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	ok = compiler.compile(graph, compiled, error);
 	CHECK(ok);
 
 	KnitsBytecodeVM vm;
 	Variant return_val;
 	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
 	CHECK(status == KnitVMStatus::Returned);
-	CHECK(bool(return_val) == false);
+	CHECK(double(return_val) == doctest::Approx(42.0));
+}
+
+TEST_CASE("[Knits] KnitGraph to clean GDScript code generation") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "ExportTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Event: _process", Vector2(100, 100));
+	entry->target_symbol = "_process";
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+	entry->add_output_pin("delta", KnitPinKind::Data, sig_float);
+
+	Ref<KnitNode> move_node = graph->create_node(KnitNodeCategory::ImpureAction, "move_and_slide", Vector2(400, 100));
+	KnitPinID move_in = move_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	move_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	graph->connect_pins(entry->id, entry_out, move_node->id, move_in);
+
+	String exported_code;
+	String error;
+	bool ok = KnitsGDScriptTranspiler::knit_graph_to_gdscript(graph, exported_code, error);
+	CHECK(ok);
+	CHECK(exported_code.contains("func _process(delta):"));
+	CHECK(exported_code.contains("move_and_slide()"));
 }
 
 } // namespace TestKnits

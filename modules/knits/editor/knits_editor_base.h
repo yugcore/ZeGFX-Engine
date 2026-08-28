@@ -37,6 +37,8 @@ private:
 	Button *add_node_btn = nullptr;
 	Button *add_frame_btn = nullptr;
 	Button *compile_btn = nullptr;
+	Button *export_gdscript_btn = nullptr;
+	Button *import_gdscript_btn = nullptr;
 	Label *status_label = nullptr;
 
 	GraphEdit *graph_edit = nullptr;
@@ -46,6 +48,12 @@ private:
 	LineEdit *search_box = nullptr;
 	Tree *palette_tree = nullptr;
 	Vector2 spawn_position;
+
+	// GDScript Export/Import Dialogs
+	AcceptDialog *export_dialog = nullptr;
+	TextEdit *export_text_edit = nullptr;
+	ConfirmationDialog *import_dialog = nullptr;
+	TextEdit *import_text_edit = nullptr;
 
 	HashMap<KnitNodeID, GraphNode *> visual_nodes;
 	HashMap<GraphNode *, KnitNodeID> node_id_lookup;
@@ -76,6 +84,9 @@ private:
 	void _on_add_node_pressed();
 	void _on_add_frame_pressed();
 	void _on_compile_pressed();
+	void _on_export_gdscript_pressed();
+	void _on_import_gdscript_pressed();
+	void _on_import_dialog_confirmed();
 
 	void _on_connection_request(const StringName &p_from, int p_from_slot, const StringName &p_to, int p_to_slot);
 	void _on_disconnection_request(const StringName &p_from, int p_from_slot, const StringName &p_to, int p_to_slot);

@@ -229,7 +229,25 @@ public:
 			}
 
 			// Constant identifiers
-			if (name.to_upper() == "PI") {
+			if (name.to_lower() == "true") {
+				uint8_t dst = compiler->allocate_register();
+				KnitInstruction inst;
+				inst.opcode = KnitOpcode::LOAD_CONST;
+				inst.dst = dst;
+				inst.imm32 = compiler->get_or_add_constant(compiled, true);
+				inst.debug_node_id = debug_node_id;
+				compiled.instructions.push_back(inst);
+				return dst;
+			} else if (name.to_lower() == "false") {
+				uint8_t dst = compiler->allocate_register();
+				KnitInstruction inst;
+				inst.opcode = KnitOpcode::LOAD_CONST;
+				inst.dst = dst;
+				inst.imm32 = compiler->get_or_add_constant(compiled, false);
+				inst.debug_node_id = debug_node_id;
+				compiled.instructions.push_back(inst);
+				return dst;
+			} else if (name.to_upper() == "PI") {
 				uint8_t dst = compiler->allocate_register();
 				KnitInstruction inst;
 				inst.opcode = KnitOpcode::LOAD_CONST;
