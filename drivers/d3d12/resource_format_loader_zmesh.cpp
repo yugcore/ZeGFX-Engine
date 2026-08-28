@@ -147,6 +147,8 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 			colors.resize(num_vertices);
 
 			bool has_custom_colors = false;
+			bool has_valid_uv2 = false;
+
 			for (uint64_t vi = 0; vi < num_vertices; ++vi) {
 				const auto *v = reinterpret_cast<const zegfx::DX12Vertex3DTextured *>(
 					vertex_data + (base_vertex + vi) * vertex_stride);
@@ -164,8 +166,8 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 				normals.set(vi, norm);
 
 				// Tangent (4-component: xyz + handedness w)
-				float tx = 1.0f, ty = 0.0f, tz = 0.0f;
-				zegfx::decodeOctahedralSNORM16(v->octTangent, tx, ty, tz);
+				float tx = 1.0f, ty = 0.0f, tz = 0.0f, tw = 1.0f;
+				zegfx::decodeOctahedralTangentSNORM16(v->octTangent, tx, ty, tz, tw);
 				Vector3 tan(tx, ty, tz);
 
 				// Orthonormalize tangent against normal (Gram-Schmidt)
@@ -181,21 +183,16 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 				tangents_arr.write[vi * 4 + 0] = tan.x;
 				tangents_arr.write[vi * 4 + 1] = tan.y;
 				tangents_arr.write[vi * 4 + 2] = tan.z;
-				tangents_arr.write[vi * 4 + 3] = 1.0f;
+				tangents_arr.write[vi * 4 + 3] = tw;
 
 				float u0 = zegfx::halfToFloat(v->u);
 				float v0 = zegfx::halfToFloat(v->v);
 				float u1 = zegfx::halfToFloat(v->u1);
 				float v1 = zegfx::halfToFloat(v->v1);
 
-				bool is_dummy_0 = (u0 == 0.0f && v0 == 0.0f) || (u0 == 0.0f && v0 == 1.0f);
-				bool is_valid_1 = (u1 != 0.0f || v1 != 0.0f) && !(u1 == 0.0f && v1 == 1.0f);
-
-				if (is_dummy_0 && is_valid_1) {
-					uvs.set(vi, Vector2(u1, v1));
-					uvs2.set(vi, Vector2(u0, v0));
-				} else {
-					uvs.set(vi, Vector2(u0, v0));
+				uvs.set(vi, Vector2(u0, v0));
+				if (u1 != 0.0f || v1 != 0.0f) {
+					has_valid_uv2 = true;
 					uvs2.set(vi, Vector2(u1, v1));
 				}
 
@@ -226,7 +223,9 @@ Ref<Resource> ResourceFormatLoaderZMesh::load(const String &p_path, const String
 			arrays[Mesh::ARRAY_NORMAL] = normals;
 			arrays[Mesh::ARRAY_TANGENT] = tangents_arr;
 			arrays[Mesh::ARRAY_TEX_UV] = uvs;
-			arrays[Mesh::ARRAY_TEX_UV2] = uvs2;
+			if (has_valid_uv2) {
+				arrays[Mesh::ARRAY_TEX_UV2] = uvs2;
+			}
 			if (has_custom_colors) {
 				arrays[Mesh::ARRAY_COLOR] = colors;
 			}
@@ -723,6 +722,7 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 
 	if (albedo_tex.is_valid()) {
 		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, albedo_tex);
+		mat->set_flag(BaseMaterial3D::FLAG_ALBEDO_TEXTURE_FORCE_SRGB, true);
 	}
 	if (normal_tex.is_valid()) {
 		mat->set_texture(BaseMaterial3D::TEXTURE_NORMAL, normal_tex);
