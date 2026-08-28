@@ -534,4 +534,433 @@ TEST_CASE("[Knits] Bitwise logical operators parity (&, |, ^, ~, <<, >>)") {
 	CHECK(int64_t(return_val) == 11);
 }
 
+TEST_CASE("[Knits] Struct Make / Break Vector3 assembly and component splitting") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "MakeBreakVec3Test";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+	KnitTypeSignature sig_vec3;
+	sig_vec3.kind = KnitDataType::Vector3;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	// Make Vector3(10.0, 20.0, 30.0)
+	Ref<KnitNode> make_node = graph->create_node(KnitNodeCategory::PureFunction, "make_vec3", Vector2(100, 200));
+	make_node->add_input_pin("x", KnitPinKind::Data, sig_float, 10.0);
+	make_node->add_input_pin("y", KnitPinKind::Data, sig_float, 20.0);
+	make_node->add_input_pin("z", KnitPinKind::Data, sig_float, 30.0);
+	KnitPinID make_out = make_node->add_output_pin("vec3", KnitPinKind::Data, sig_vec3);
+
+	// Break Vector3
+	Ref<KnitNode> break_node = graph->create_node(KnitNodeCategory::PureFunction, "break_vec3", Vector2(300, 200));
+	KnitPinID break_in = break_node->add_input_pin("vec3", KnitPinKind::Data, sig_vec3);
+	KnitPinID break_x = break_node->add_output_pin("x", KnitPinKind::Data, sig_float);
+	KnitPinID break_y = break_node->add_output_pin("y", KnitPinKind::Data, sig_float);
+	KnitPinID break_z = break_node->add_output_pin("z", KnitPinKind::Data, sig_float);
+
+	graph->connect_pins(make_node->id, make_out, break_node->id, break_in);
+
+	// Add x + y
+	Ref<KnitNode> add_node = graph->create_node(KnitNodeCategory::PureFunction, "add", Vector2(500, 200));
+	KnitPinID add_a = add_node->add_input_pin("a", KnitPinKind::Data, sig_float);
+	KnitPinID add_b = add_node->add_input_pin("b", KnitPinKind::Data, sig_float);
+	KnitPinID add_out = add_node->add_output_pin("res", KnitPinKind::Data, sig_float);
+
+	graph->connect_pins(break_node->id, break_x, add_node->id, add_a);
+	graph->connect_pins(break_node->id, break_y, add_node->id, add_b);
+
+	// Return (10.0 + 20.0) = 30.0
+	Ref<KnitNode> ret_node = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(700, 100));
+	KnitPinID ret_in_exec = ret_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	KnitPinID ret_in_val = ret_node->add_input_pin("val", KnitPinKind::Data, sig_float);
+
+	graph->connect_pins(entry->id, entry_out, ret_node->id, ret_in_exec);
+	graph->connect_pins(add_node->id, add_out, ret_node->id, ret_in_val);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(double(return_val) == doctest::Approx(30.0));
+}
+
+TEST_CASE("[Knits] Select (Ternary) pure logic node") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "SelectTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_bool;
+	sig_bool.kind = KnitDataType::Bool;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	// Select: condition = true, TrueVal = 42.0, FalseVal = 99.0
+	Ref<KnitNode> select_node = graph->create_node(KnitNodeCategory::PureFunction, "select", Vector2(200, 200));
+	select_node->add_input_pin("Condition", KnitPinKind::Data, sig_bool, true);
+	select_node->add_input_pin("True", KnitPinKind::Data, sig_float, 42.0);
+	select_node->add_input_pin("False", KnitPinKind::Data, sig_float, 99.0);
+	KnitPinID select_out = select_node->add_output_pin("Result", KnitPinKind::Data, sig_float);
+
+	Ref<KnitNode> ret_node = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(400, 100));
+	KnitPinID ret_in_exec = ret_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	KnitPinID ret_in_val = ret_node->add_input_pin("val", KnitPinKind::Data, sig_float);
+
+	graph->connect_pins(entry->id, entry_out, ret_node->id, ret_in_exec);
+	graph->connect_pins(select_node->id, select_out, ret_node->id, ret_in_val);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(double(return_val) == doctest::Approx(42.0));
+}
+
+TEST_CASE("[Knits] Branch (If / Else) control flow branching") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "BranchTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_bool;
+	sig_bool.kind = KnitDataType::Bool;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	Ref<KnitNode> branch = graph->create_node(KnitNodeCategory::FlowControl, "Branch", Vector2(200, 100));
+	KnitPinID branch_in = branch->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	branch->add_input_pin("Condition", KnitPinKind::Data, sig_bool, false); // False branch taken!
+	KnitPinID branch_true = branch->add_output_pin("True", KnitPinKind::Execution, sig_exec);
+	KnitPinID branch_false = branch->add_output_pin("False", KnitPinKind::Execution, sig_exec);
+
+	graph->connect_pins(entry->id, entry_out, branch->id, branch_in);
+
+	// True Return: 100.0
+	Ref<KnitNode> ret_true = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(400, 50));
+	KnitPinID ret_true_in = ret_true->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	ret_true->add_input_pin("val", KnitPinKind::Data, sig_float, 100.0);
+	graph->connect_pins(branch->id, branch_true, ret_true->id, ret_true_in);
+
+	// False Return: 200.0
+	Ref<KnitNode> ret_false = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(400, 200));
+	KnitPinID ret_false_in = ret_false->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	ret_false->add_input_pin("val", KnitPinKind::Data, sig_float, 200.0);
+	graph->connect_pins(branch->id, branch_false, ret_false->id, ret_false_in);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(double(return_val) == doctest::Approx(200.0));
+}
+
+TEST_CASE("[Knits] Reroute Knot pass-through data transmission") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "RerouteTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+	KnitTypeSignature sig_wild;
+	sig_wild.kind = KnitDataType::Wildcard;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	// Pure Add: 15.0 + 25.0 = 40.0
+	Ref<KnitNode> add_node = graph->create_node(KnitNodeCategory::PureFunction, "add", Vector2(100, 200));
+	add_node->add_input_pin("a", KnitPinKind::Data, sig_float, 15.0);
+	add_node->add_input_pin("b", KnitPinKind::Data, sig_float, 25.0);
+	KnitPinID add_out = add_node->add_output_pin("res", KnitPinKind::Data, sig_float);
+
+	// Reroute Knot
+	Ref<KnitNode> reroute = graph->create_node(KnitNodeCategory::PureFunction, "Reroute", Vector2(300, 200));
+	KnitPinID reroute_in = reroute->add_input_pin("In", KnitPinKind::Data, sig_wild);
+	KnitPinID reroute_out = reroute->add_output_pin("Out", KnitPinKind::Data, sig_wild);
+
+	graph->connect_pins(add_node->id, add_out, reroute->id, reroute_in);
+
+	Ref<KnitNode> ret_node = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(500, 100));
+	KnitPinID ret_in_exec = ret_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	KnitPinID ret_in_val = ret_node->add_input_pin("val", KnitPinKind::Data, sig_float);
+
+	graph->connect_pins(entry->id, entry_out, ret_node->id, ret_in_exec);
+	graph->connect_pins(reroute->id, reroute_out, ret_node->id, ret_in_val);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(double(return_val) == doctest::Approx(40.0));
+}
+
+TEST_CASE("[Knits] Inline Math Expression formula parsing and execution") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "MathExpressionTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	// Expression: (x + y) * 2.0 - sqrt(z)
+	// Inputs: x = 10.0, y = 5.0, z = 16.0
+	// Result: (10 + 5) * 2 - 4 = 26.0
+	Ref<KnitNode> expr_node = graph->create_node(KnitNodeCategory::PureFunction, "Math Expression", Vector2(200, 200));
+	expr_node->target_symbol = "(x + y) * 2.0 - sqrt(z)";
+	expr_node->add_input_pin("x", KnitPinKind::Data, sig_float, 10.0);
+	expr_node->add_input_pin("y", KnitPinKind::Data, sig_float, 5.0);
+	expr_node->add_input_pin("z", KnitPinKind::Data, sig_float, 16.0);
+	KnitPinID expr_out = expr_node->add_output_pin("Result", KnitPinKind::Data, sig_float);
+
+	Ref<KnitNode> ret_node = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(500, 100));
+	KnitPinID ret_in_exec = ret_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	KnitPinID ret_in_val = ret_node->add_input_pin("val", KnitPinKind::Data, sig_float);
+
+	graph->connect_pins(entry->id, entry_out, ret_node->id, ret_in_exec);
+	graph->connect_pins(expr_node->id, expr_out, ret_node->id, ret_in_val);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(double(return_val) == doctest::Approx(26.0));
+}
+
+TEST_CASE("[Knits] Do Once stateful gate execution") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "DoOnceTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+	KnitTypeSignature sig_bool;
+	sig_bool.kind = KnitDataType::Bool;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	Ref<KnitNode> do_once = graph->create_node(KnitNodeCategory::FlowControl, "Do Once", Vector2(200, 100));
+	KnitPinID do_once_in = do_once->add_input_pin("In", KnitPinKind::Execution, sig_exec);
+	do_once->add_input_pin("Reset", KnitPinKind::Execution, sig_exec);
+	do_once->add_input_pin("Start Closed", KnitPinKind::Data, sig_bool, false);
+	KnitPinID do_once_out = do_once->add_output_pin("Out", KnitPinKind::Execution, sig_exec);
+
+	graph->connect_pins(entry->id, entry_out, do_once->id, do_once_in);
+
+	Ref<KnitNode> ret_node = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(400, 100));
+	KnitPinID ret_in_exec = ret_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	ret_node->add_input_pin("val", KnitPinKind::Data, sig_float, 99.0);
+
+	graph->connect_pins(do_once->id, do_once_out, ret_node->id, ret_in_exec);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+
+	// First execution -> Executes Out branch -> Returns 99.0
+	KnitVMStatus status1 = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+	CHECK(status1 == KnitVMStatus::Returned);
+	CHECK(double(return_val) == doctest::Approx(99.0));
+
+	// Second execution -> Do Once already fired -> Bypasses Out branch -> Returns Ok
+	Variant return_val2;
+	KnitVMStatus status2 = vm.execute(compiled, nullptr, nullptr, 0, return_val2);
+	CHECK(status2 == KnitVMStatus::Ok);
+}
+
+TEST_CASE("[Knits] Flip Flop alternating gate execution") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "FlipFlopTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+	KnitTypeSignature sig_bool;
+	sig_bool.kind = KnitDataType::Bool;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	Ref<KnitNode> flip_flop = graph->create_node(KnitNodeCategory::FlowControl, "Flip Flop", Vector2(200, 100));
+	KnitPinID ff_in = flip_flop->add_input_pin("In", KnitPinKind::Execution, sig_exec);
+	KnitPinID ff_a = flip_flop->add_output_pin("A", KnitPinKind::Execution, sig_exec);
+	KnitPinID ff_b = flip_flop->add_output_pin("B", KnitPinKind::Execution, sig_exec);
+	flip_flop->add_output_pin("Is A", KnitPinKind::Data, sig_bool);
+
+	graph->connect_pins(entry->id, entry_out, flip_flop->id, ff_in);
+
+	// Branch A -> Returns 111.0
+	Ref<KnitNode> ret_a = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(400, 50));
+	KnitPinID ret_a_in = ret_a->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	ret_a->add_input_pin("val", KnitPinKind::Data, sig_float, 111.0);
+	graph->connect_pins(flip_flop->id, ff_a, ret_a->id, ret_a_in);
+
+	// Branch B -> Returns 222.0
+	Ref<KnitNode> ret_b = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(400, 200));
+	KnitPinID ret_b_in = ret_b->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	ret_b->add_input_pin("val", KnitPinKind::Data, sig_float, 222.0);
+	graph->connect_pins(flip_flop->id, ff_b, ret_b->id, ret_b_in);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+
+	// First execution -> Branch A
+	Variant return_val1;
+	KnitVMStatus status1 = vm.execute(compiled, nullptr, nullptr, 0, return_val1);
+	CHECK(status1 == KnitVMStatus::Returned);
+	CHECK(double(return_val1) == doctest::Approx(111.0));
+
+	// Second execution -> Branch B
+	Variant return_val2;
+	KnitVMStatus status2 = vm.execute(compiled, nullptr, nullptr, 0, return_val2);
+	CHECK(status2 == KnitVMStatus::Returned);
+	CHECK(double(return_val2) == doctest::Approx(222.0));
+
+	// Third execution -> Branch A
+	Variant return_val3;
+	KnitVMStatus status3 = vm.execute(compiled, nullptr, nullptr, 0, return_val3);
+	CHECK(status3 == KnitVMStatus::Returned);
+	CHECK(double(return_val3) == doctest::Approx(111.0));
+}
+
+TEST_CASE("[Knits] Character Move & Jump 3D and Raycast Query 3D compilation") {
+	Ref<KnitsGraph> graph;
+	graph.instantiate();
+	graph->graph_name = "GameplayNodesTest";
+
+	KnitTypeSignature sig_exec;
+	sig_exec.kind = KnitDataType::Execution;
+	KnitTypeSignature sig_vec2;
+	sig_vec2.kind = KnitDataType::Vector2;
+	KnitTypeSignature sig_vec3;
+	sig_vec3.kind = KnitDataType::Vector3;
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+	KnitTypeSignature sig_bool;
+	sig_bool.kind = KnitDataType::Bool;
+	KnitTypeSignature sig_int;
+	sig_int.kind = KnitDataType::Int32;
+	KnitTypeSignature sig_obj;
+	sig_obj.kind = KnitDataType::ObjectRef;
+
+	Ref<KnitNode> entry = graph->create_node(KnitNodeCategory::Event, "Entry", Vector2(50, 100));
+	KnitPinID entry_out = entry->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+	Ref<KnitNode> move_node = graph->create_node(KnitNodeCategory::ImpureAction, "Character Move & Jump 3D", Vector2(200, 100));
+	KnitPinID move_in = move_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	move_node->add_input_pin("Character", KnitPinKind::Data, sig_obj);
+	move_node->add_input_pin("Input Dir", KnitPinKind::Data, sig_vec2, Vector2(1, 0));
+	move_node->add_input_pin("Speed", KnitPinKind::Data, sig_float, 6.0);
+	move_node->add_input_pin("Jump", KnitPinKind::Data, sig_bool, false);
+	move_node->add_input_pin("Jump Velocity", KnitPinKind::Data, sig_float, 5.0);
+	move_node->add_input_pin("Gravity", KnitPinKind::Data, sig_float, 9.8);
+	move_node->add_input_pin("Delta", KnitPinKind::Data, sig_float, 0.0166);
+	KnitPinID move_out = move_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+	move_node->add_output_pin("Is Grounded", KnitPinKind::Data, sig_bool);
+	move_node->add_output_pin("Velocity", KnitPinKind::Data, sig_vec3);
+
+	graph->connect_pins(entry->id, entry_out, move_node->id, move_in);
+
+	Ref<KnitNode> ray_node = graph->create_node(KnitNodeCategory::ImpureAction, "Raycast Query 3D", Vector2(450, 100));
+	KnitPinID ray_in = ray_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	ray_node->add_input_pin("Origin", KnitPinKind::Data, sig_vec3, Vector3(0, 5, 0));
+	ray_node->add_input_pin("Target", KnitPinKind::Data, sig_vec3, Vector3(0, -5, 0));
+	ray_node->add_input_pin("Collision Mask", KnitPinKind::Data, sig_int, 1);
+	KnitPinID ray_out = ray_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+	KnitPinID ray_hit = ray_node->add_output_pin("Hit", KnitPinKind::Data, sig_bool);
+	ray_node->add_output_pin("Hit Position", KnitPinKind::Data, sig_vec3);
+	ray_node->add_output_pin("Hit Normal", KnitPinKind::Data, sig_vec3);
+	ray_node->add_output_pin("Hit Collider", KnitPinKind::Data, sig_obj);
+
+	graph->connect_pins(move_node->id, move_out, ray_node->id, ray_in);
+
+	Ref<KnitNode> ret_node = graph->create_node(KnitNodeCategory::ImpureAction, "return", Vector2(700, 100));
+	KnitPinID ret_in_exec = ret_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+	KnitPinID ret_in_val = ret_node->add_input_pin("val", KnitPinKind::Data, sig_bool);
+
+	graph->connect_pins(ray_node->id, ray_out, ret_node->id, ret_in_exec);
+	graph->connect_pins(ray_node->id, ray_hit, ret_node->id, ret_in_val);
+
+	KnitsCompiler compiler;
+	KnitCompiledGraph compiled;
+	String error;
+	bool ok = compiler.compile(graph, compiled, error);
+	CHECK(ok);
+
+	KnitsBytecodeVM vm;
+	Variant return_val;
+	KnitVMStatus status = vm.execute(compiled, nullptr, nullptr, 0, return_val);
+	CHECK(status == KnitVMStatus::Returned);
+	CHECK(bool(return_val) == false);
+}
+
 } // namespace TestKnits

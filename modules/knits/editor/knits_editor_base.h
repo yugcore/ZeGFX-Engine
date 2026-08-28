@@ -89,6 +89,20 @@ private:
 	void _on_search_text_changed(const String &p_text);
 	void _spawn_selected_palette_node();
 
+	// Wire-pull drag context for context-sensitive quick-spawn
+	KnitNodeID wire_drag_source_node = 0;
+	KnitPinID wire_drag_source_pin = 0;
+	bool wire_drag_is_output = true;
+	KnitPinKind wire_drag_pin_kind = KnitPinKind::Data;
+	KnitDataType wire_drag_data_type = KnitDataType::Wildcard;
+
+	void _on_add_pin_pressed(KnitNodeID p_node_id);
+	void _on_remove_pin_pressed(KnitNodeID p_node_id);
+	void _on_expression_text_submitted(const String &p_text, KnitNodeID p_node_id);
+
+	void _on_connection_to_empty(const StringName &p_from, int p_from_slot, const Vector2 &p_release_position);
+	void _on_connection_from_empty(const StringName &p_to, int p_to_slot, const Vector2 &p_release_position);
+
 protected:
 	void _notification(int p_what);
 	static void _bind_methods();

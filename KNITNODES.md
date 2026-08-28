@@ -101,11 +101,34 @@ Every node in KnitNodes communicates via **Pins** connected by **Wires**.
 | KnitNode Name | Input Pins | Output Pins | GDScript Equivalent | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **`Branch (If / Else)`** | `FlowIn`, `Condition (Bool)` | `True (Exec)`, `False (Exec)` | `if condition: ... else: ...` | Routes execution based on whether `Condition` is true or false. |
+| **`Sequence`** | `FlowIn` | `Then 0 (Exec)`, `Then 1 (Exec)`, `...` | Sequential lines of code | Executes multiple execution flow branches sequentially on the same frame. Expandable with `+ Pin`. |
+| **`Do Once`** | `In (Exec)`, `Reset (Exec)`, `Start Closed (Bool)` | `Out (Exec)` | Stateful single-trigger gate | Executes its `Out` flow branch only once until explicitly reset via the `Reset` pin. |
+| **`Flip Flop`** | `In (Exec)` | `A (Exec)`, `B (Exec)`, `Is A (Bool)` | Alternating toggle | Alternates execution between outputs `A` and `B` on each incoming impulse, outputting current state. |
+| **`Gate`** | `In (Exec)`, `Open`, `Close`, `Toggle`, `Start Closed` | `Out (Exec)`, `Is Open (Bool)` | Controllable gate | Pass-through gate controlled by discrete Open, Close, and Toggle inputs. |
 | **`While Loop`** | `FlowIn`, `Condition (Bool)` | `LoopBody (Exec)`, `Completed (Exec)` | `while condition:` | Repeatedly runs `LoopBody` while `Condition` remains true. |
 | **`For Each Loop`** | `FlowIn`, `Collection (Array)` | `LoopBody (Exec)`, `Element (T)`, `Completed (Exec)` | `for item in array:` | Iterates through each item in an array or container. |
 | **`Delay (Seconds)`** | `FlowIn`, `Seconds (Float)` | `FlowOut (Exec)` | `await get_tree().create_timer(sec).timeout` | Suspends graph coroutine execution for the specified time duration. |
 | **`Delay (Frames)`** | `FlowIn`, `Frames (Int)` | `FlowOut (Exec)` | `await get_tree().process_frame` | Suspends graph coroutine execution for N engine frame ticks. |
 | **`Return`** | `FlowIn`, `Value (T)` | *Terminal* | `return value` | Exits the active graph or function with an optional return value. |
+
+---
+
+## 4.1 Structs & Vectors (Make / Break)
+
+| KnitNode Name | Input Pins | Output Pins | GDScript Equivalent | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`Make Vector2`** | `x (Float)`, `y (Float)` | `Vector2 (Vector2)` | `Vector2(x, y)` | Assembles a 2D vector from components. |
+| **`Break Vector2`** | `Vector2 (Vector2)` | `x (Float)`, `y (Float)` | `v.x, v.y` | Deconstructs a 2D vector into components. |
+| **`Make Vector3`** | `x (Float)`, `y (Float)`, `z (Float)` | `Vector3 (Vector3)` | `Vector3(x, y, z)` | Assembles a 3D vector from components. |
+| **`Break Vector3`** | `Vector3 (Vector3)` | `x (Float)`, `y (Float)`, `z (Float)` | `v.x, v.y, v.z` | Deconstructs a 3D vector into components. |
+| **`Make Vector4`** | `x`, `y`, `z`, `w` | `Vector4 (Vector4)` | `Vector4(x, y, z, w)` | Assembles a 4D vector from components. |
+| **`Break Vector4`** | `Vector4 (Vector4)` | `x`, `y`, `z`, `w` | `v.x, v.y, v.z, v.w` | Deconstructs a 4D vector into components. |
+| **`Make Color`** | `r`, `g`, `b`, `a` | `Color (Color)` | `Color(r, g, b, a)` | Assembles an RGBA color from components. |
+| **`Break Color`** | `Color (Color)` | `r`, `g`, `b`, `a` | `c.r, c.g, c.b, c.a` | Deconstructs an RGBA color into components. |
+| **`Make Rect2`** | `position (Vector2)`, `size (Vector2)` | `Rect2 (Rect2)` | `Rect2(pos, size)` | Assembles a 2D rectangle. |
+| **`Break Rect2`** | `Rect2 (Rect2)` | `position (Vector2)`, `size (Vector2)` | `r.position, r.size` | Deconstructs a 2D rectangle. |
+| **`Make Transform3D`** | `rotation (Vector3)`, `origin (Vector3)` | `Transform3D (Transform3D)` | `Transform3D(Basis.from_euler(r), o)` | Assembles a 3D coordinate transform. |
+| **`Break Transform3D`** | `Transform3D (Transform3D)` | `origin`, `rotation`, `scale` | `t.origin, t.basis.get_euler(), t.basis.get_scale()` | Deconstructs a 3D coordinate transform into origin, rotation, and scale. |
 
 ---
 
@@ -154,6 +177,7 @@ Every node in KnitNodes communicates via **Pins** connected by **Wires**.
 
 | KnitNode Name | Inputs | Outputs | GDScript Equivalent | Description |
 | :--- | :--- | :--- | :--- | :--- |
+| **`Math Expression`** | *Dynamic Variables (e.g. `x`, `y`, `speed`)* | `Result (Float)` | `(x + y) * 2.0 - sin(z)` | Compiles an arbitrary inline mathematical formula directly into high-speed bytecode with automatic input pin generation. |
 | **`Sin / Cos / Tan`** | `Angle (Float)` | `Result (Float)` | `sin(x)`, `cos(x)`, `tan(x)` | Trigonometric ratios in radians. |
 | **`ASin / ACos / ATan`** | `Value (Float)` | `Angle (Float)` | `asin(x)`, `acos(x)`, `atan(x)` | Inverse trigonometric angles in radians. |
 | **`ATan2`** | `Y (Float)`, `X (Float)` | `Angle (Float)` | `atan2(y, x)` | Four-quadrant arc tangent. |

@@ -307,6 +307,24 @@ void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 	Vector<KnitPinID> in_pins;
 	Vector<KnitPinID> out_pins;
 
+	if (p_node->title == "Math Expression" || p_node->title == "math_expression" || p_node->title == "expression") {
+		HBoxContainer *expr_box = memnew(HBoxContainer);
+		expr_box->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		expr_box->set_custom_minimum_size(Size2(140, 24));
+		Label *lbl = memnew(Label);
+		lbl->set_text("f =");
+		lbl->add_theme_color_override("font_color", Color(0.35f, 0.80f, 1.0f));
+		expr_box->add_child(lbl);
+
+		LineEdit *expr_edit = memnew(LineEdit);
+		expr_edit->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		expr_edit->set_text(p_node->target_symbol.is_empty() ? "x + y" : String(p_node->target_symbol));
+		expr_edit->set_tooltip_text("Press Enter to update formula variables (e.g. (a + b) * sin(c))");
+		expr_edit->connect("text_submitted", callable_mp(this, &KnitsEditorBase::_on_expression_text_submitted).bind(p_node->id));
+		expr_box->add_child(expr_edit);
+		gn->add_child(expr_box);
+	}
+
 	int max_slots = MAX(p_node->input_pins.size(), p_node->output_pins.size());
 	if (max_slots == 0) max_slots = 1;
 
@@ -380,6 +398,27 @@ void KnitsEditorBase::_create_visual_node(const Ref<KnitNode> &p_node) {
 
 	input_slot_to_pin[p_node->id] = in_pins;
 	output_slot_to_pin[p_node->id] = out_pins;
+
+	String node_title = p_node->title;
+	if (node_title == "array_construct" || node_title == "dict_construct" || node_title == "format_str" || node_title == "str" || node_title == "Sequence") {
+		HBoxContainer *btn_row = memnew(HBoxContainer);
+		btn_row->set_alignment(BoxContainer::ALIGNMENT_CENTER);
+		btn_row->set_custom_minimum_size(Size2(0, 22));
+
+		Button *add_btn = memnew(Button);
+		add_btn->set_text("+ Pin");
+		add_btn->set_focus_mode(Control::FOCUS_NONE);
+		add_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_add_pin_pressed).bind(p_node->id));
+		btn_row->add_child(add_btn);
+
+		Button *rem_btn = memnew(Button);
+		rem_btn->set_text("- Pin");
+		rem_btn->set_focus_mode(Control::FOCUS_NONE);
+		rem_btn->connect("pressed", callable_mp(this, &KnitsEditorBase::_on_remove_pin_pressed).bind(p_node->id));
+		btn_row->add_child(rem_btn);
+
+		gn->add_child(btn_row);
+	}
 
 	graph_edit->add_child(gn);
 }
@@ -569,11 +608,32 @@ void KnitsEditorBase::_populate_palette_tree(const String &p_filter) {
 
 	TreeItem *cat_flow = add_category("Flow Control");
 	add_item(cat_flow, "Branch (If / Else)", "Branches execution based on condition", "flow_branch");
+	add_item(cat_flow, "Sequence", "Executes multiple flow branches in sequence", "flow_sequence");
+	add_item(cat_flow, "Do Once", "Executes flow branch only once until reset", "flow_do_once");
+	add_item(cat_flow, "Flip Flop", "Alternates execution between outputs A and B", "flow_flip_flop");
+	add_item(cat_flow, "Gate", "Controllable flow gate with open/close/toggle", "flow_gate");
+	add_item(cat_flow, "Reroute Knot", "Lightweight pass-through routing knot", "flow_reroute");
 	add_item(cat_flow, "While Loop", "Executes loop body while condition is true", "flow_while");
 	add_item(cat_flow, "For Each Loop", "Iterates over elements in array or range", "flow_foreach");
 	add_item(cat_flow, "Delay (Seconds)", "Suspends coroutine execution for duration", "flow_yield_sec");
 	add_item(cat_flow, "Delay (Frames)", "Suspends coroutine for N frame ticks", "flow_yield_frame");
 	add_item(cat_flow, "Return", "Returns from script function with value", "flow_return");
+
+	TreeItem *cat_structs = add_category("Structs & Vectors (Make / Break)");
+	add_item(cat_structs, "Make Vector2", "Constructs Vector2 from (x, y)", "make_vec2");
+	add_item(cat_structs, "Break Vector2", "Splits Vector2 into (x, y)", "break_vec2");
+	add_item(cat_structs, "Make Vector3", "Constructs Vector3 from (x, y, z)", "make_vec3");
+	add_item(cat_structs, "Break Vector3", "Splits Vector3 into (x, y, z)", "break_vec3");
+	add_item(cat_structs, "Make Vector4", "Constructs Vector4 from (x, y, z, w)", "make_vec4");
+	add_item(cat_structs, "Break Vector4", "Splits Vector4 into (x, y, z, w)", "break_vec4");
+	add_item(cat_structs, "Make Color", "Constructs Color from (r, g, b, a)", "make_color");
+	add_item(cat_structs, "Break Color", "Splits Color into (r, g, b, a)", "break_color");
+	add_item(cat_structs, "Make Rect2", "Constructs Rect2 from (pos, size)", "make_rect2");
+	add_item(cat_structs, "Break Rect2", "Splits Rect2 into (pos, size)", "break_rect2");
+	add_item(cat_structs, "Make Transform2D", "Constructs Transform2D from rotation & origin", "make_transform2d");
+	add_item(cat_structs, "Break Transform2D", "Splits Transform2D into origin & rotation", "break_transform2d");
+	add_item(cat_structs, "Make Transform3D", "Constructs Transform3D from rotation & origin", "make_transform3d");
+	add_item(cat_structs, "Break Transform3D", "Splits Transform3D into origin, rotation, scale", "break_transform3d");
 
 	TreeItem *cat_ops = add_category("Operators & Arithmetic");
 	add_item(cat_ops, "Add (+)", "Adds two numbers or vectors", "math_add");
@@ -602,8 +662,10 @@ void KnitsEditorBase::_populate_palette_tree(const String &p_filter) {
 	add_item(cat_cmp, "Logical NOT (!)", "Inverts boolean value", "logic_not");
 	add_item(cat_cmp, "Logical AND (&&)", "Logical AND between two booleans", "logic_and");
 	add_item(cat_cmp, "Logical OR (||)", "Logical OR between two booleans", "logic_or");
+	add_item(cat_cmp, "Select (Ternary ? :)", "Returns A if condition is true, else B", "logic_select");
 
 	TreeItem *cat_math = add_category("Math & Trigonometry");
+	add_item(cat_math, "Math Expression", "Inline math formula parser (e.g. (a + b) * sin(c))", "math_expression");
 	add_item(cat_math, "Sin", "Sine of angle in radians", "math_sin");
 	add_item(cat_math, "Cos", "Cosine of angle in radians", "math_cos");
 	add_item(cat_math, "Tan", "Tangent of angle in radians", "math_tan");
@@ -654,6 +716,14 @@ void KnitsEditorBase::_populate_palette_tree(const String &p_filter) {
 	add_item(cat_type, "Is Instance Valid", "Checks if object reference is alive", "type_is_valid");
 	add_item(cat_type, "Type Test (Is)", "Tests if instance matches class or type", "type_test");
 
+	TreeItem *cat_gameplay = add_category("Gameplay & Physics");
+	add_item(cat_gameplay, "Character Move & Jump 3D", "Unified kinematic movement & jump for CharacterBody3D", "gameplay_char_move_jump_3d");
+	add_item(cat_gameplay, "Raycast Query 3D", "Performs single-line 3D physics raycast", "gameplay_raycast_3d");
+
+	TreeItem *cat_anim = add_category("Animation & Audio");
+	add_item(cat_anim, "Tween Property", "Interpolates node property over time", "anim_tween_property");
+	add_item(cat_anim, "Play Sound 3D", "Spawns a 3D audio one-shot sound", "audio_play_sound_3d");
+
 	TreeItem *cat_actions = add_category("Actions & Debugging");
 	add_item(cat_actions, "Print Message", "Prints value to console", "action_print");
 	add_item(cat_actions, "Print Rich", "Prints BBCode formatted text", "action_print_rich");
@@ -662,6 +732,100 @@ void KnitsEditorBase::_populate_palette_tree(const String &p_filter) {
 	add_item(cat_actions, "Push Warning", "Pushes engine debugger warning", "action_push_warning");
 	add_item(cat_actions, "Assert", "Asserts condition is true in debug builds", "action_assert");
 	add_item(cat_actions, "Move and Slide", "Performs character body movement with collision", "action_move_and_slide");
+
+	// Dynamic Engine Classes (ClassDB Auto-Discovery)
+	TreeItem *cat_classes = add_category("Engine Classes (ClassDB)");
+	static const char *common_classes[] = {
+		"Node", "Node2D", "Node3D", "Control",
+		"CharacterBody2D", "CharacterBody3D", "RigidBody3D", "Area3D", "Area2D",
+		"Camera3D", "Camera2D", "AudioStreamPlayer", "AudioStreamPlayer3D",
+		"AnimationPlayer", "Timer", "Sprite2D", "Sprite3D", "MeshInstance3D",
+		"RayCast3D", "RayCast2D", "Label", "Button", "ProgressBar", "TextureRect",
+		"HTTPRequest"
+	};
+
+	Vector<StringName> target_classes;
+	if (p_filter.is_empty()) {
+		for (const char *cls_name : common_classes) {
+			target_classes.push_back(StringName(cls_name));
+		}
+	} else {
+		LocalVector<StringName> all_classes;
+		ClassDB::get_class_list(all_classes);
+		for (uint32_t i = 0; i < all_classes.size(); i++) {
+			const StringName &cls = all_classes[i];
+			if (String(cls).findn(p_filter) != -1) {
+				target_classes.push_back(cls);
+			}
+		}
+		for (const char *cls_name : common_classes) {
+			if (!target_classes.has(StringName(cls_name))) {
+				target_classes.push_back(StringName(cls_name));
+			}
+		}
+	}
+
+	for (int c = 0; c < target_classes.size(); c++) {
+		StringName cls = target_classes[c];
+		if (!ClassDB::class_exists(cls)) continue;
+
+		TreeItem *class_cat = nullptr;
+
+		// 1. Methods
+		List<MethodInfo> methods;
+		ClassDB::get_method_list(cls, &methods, true);
+		for (const MethodInfo &m : methods) {
+			if (m.name.begins_with("_")) continue;
+			if (!p_filter.is_empty() && String(m.name).findn(p_filter) == -1 && String(cls).findn(p_filter) == -1) continue;
+
+			if (!class_cat) {
+				class_cat = palette_tree->create_item(cat_classes);
+				class_cat->set_text(0, String(cls));
+			}
+
+			TreeItem *m_item = palette_tree->create_item(class_cat);
+			m_item->set_text(0, vformat("Call: %s.%s()", String(cls), String(m.name)));
+			m_item->set_metadata(0, vformat("class_method:%s:%s", String(cls), String(m.name)));
+		}
+
+		// 2. Properties (Get / Set)
+		List<PropertyInfo> props;
+		ClassDB::get_property_list(cls, &props, true);
+		for (const PropertyInfo &p : props) {
+			if (p.name.begins_with("_")) continue;
+			if (p.usage & PROPERTY_USAGE_GROUP || p.usage & PROPERTY_USAGE_CATEGORY || p.usage & PROPERTY_USAGE_SUBGROUP) continue;
+			if (!p_filter.is_empty() && String(p.name).findn(p_filter) == -1 && String(cls).findn(p_filter) == -1) continue;
+
+			if (!class_cat) {
+				class_cat = palette_tree->create_item(cat_classes);
+				class_cat->set_text(0, String(cls));
+			}
+
+			TreeItem *get_item = palette_tree->create_item(class_cat);
+			get_item->set_text(0, vformat("Get: %s.%s", String(cls), String(p.name)));
+			get_item->set_metadata(0, vformat("class_prop_get:%s:%s", String(cls), String(p.name)));
+
+			TreeItem *set_item = palette_tree->create_item(class_cat);
+			set_item->set_text(0, vformat("Set: %s.%s", String(cls), String(p.name)));
+			set_item->set_metadata(0, vformat("class_prop_set:%s:%s", String(cls), String(p.name)));
+		}
+
+		// 3. Signals
+		List<MethodInfo> signals;
+		ClassDB::get_signal_list(cls, &signals, true);
+		for (const MethodInfo &sig : signals) {
+			if (!p_filter.is_empty() && String(sig.name).findn(p_filter) == -1 && String(cls).findn(p_filter) == -1) continue;
+
+			if (!class_cat) {
+				class_cat = palette_tree->create_item(cat_classes);
+				class_cat->set_text(0, String(cls));
+			}
+
+			TreeItem *sig_item = palette_tree->create_item(class_cat);
+			sig_item->set_text(0, vformat("Signal: %s.%s", String(cls), String(sig.name)));
+			sig_item->set_metadata(0, vformat("class_signal:%s:%s", String(cls), String(sig.name)));
+		}
+	}
 }
 
 void KnitsEditorBase::_on_compile_pressed() {
@@ -1076,6 +1240,332 @@ void KnitsEditorBase::_spawn_selected_palette_node() {
 		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
 		new_node->add_input_pin("condition", KnitPinKind::Data, sig_bool, true);
 		new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+	} else if (tag == "flow_sequence") {
+		new_node = graph->create_node(KnitNodeCategory::FlowControl, "Sequence", spawn_position);
+		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Then 0", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Then 1", KnitPinKind::Execution, sig_exec);
+	} else if (tag == "logic_select") {
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "Select", spawn_position);
+		new_node->add_input_pin("Condition", KnitPinKind::Data, sig_bool, true);
+		new_node->add_input_pin("True", KnitPinKind::Data, sig_wild);
+		new_node->add_input_pin("False", KnitPinKind::Data, sig_wild);
+		new_node->add_output_pin("Result", KnitPinKind::Data, sig_wild);
+
+	// Make / Break Structs & Components
+	} else if (tag == "make_vec2") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_vec2", spawn_position);
+		new_node->add_input_pin("x", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("y", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_output_pin("vec2", KnitPinKind::Data, sig_vec2);
+	} else if (tag == "break_vec2") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_vec2", spawn_position);
+		new_node->add_input_pin("vec2", KnitPinKind::Data, sig_vec2);
+		new_node->add_output_pin("x", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("y", KnitPinKind::Data, sig_float);
+	} else if (tag == "make_vec3") {
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_vec3", spawn_position);
+		new_node->add_input_pin("x", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("y", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("z", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_output_pin("vec3", KnitPinKind::Data, sig_vec3);
+	} else if (tag == "break_vec3") {
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_vec3", spawn_position);
+		new_node->add_input_pin("vec3", KnitPinKind::Data, sig_vec3);
+		new_node->add_output_pin("x", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("y", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("z", KnitPinKind::Data, sig_float);
+	} else if (tag == "make_vec4") {
+		KnitTypeSignature sig_vec4;
+		sig_vec4.kind = KnitDataType::Vector4;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_vec4", spawn_position);
+		new_node->add_input_pin("x", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("y", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("z", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("w", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_output_pin("vec4", KnitPinKind::Data, sig_vec4);
+	} else if (tag == "break_vec4") {
+		KnitTypeSignature sig_vec4;
+		sig_vec4.kind = KnitDataType::Vector4;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_vec4", spawn_position);
+		new_node->add_input_pin("vec4", KnitPinKind::Data, sig_vec4);
+		new_node->add_output_pin("x", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("y", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("z", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("w", KnitPinKind::Data, sig_float);
+	} else if (tag == "make_color") {
+		KnitTypeSignature sig_col;
+		sig_col.kind = KnitDataType::Color;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_color", spawn_position);
+		new_node->add_input_pin("r", KnitPinKind::Data, sig_float, 1.0);
+		new_node->add_input_pin("g", KnitPinKind::Data, sig_float, 1.0);
+		new_node->add_input_pin("b", KnitPinKind::Data, sig_float, 1.0);
+		new_node->add_input_pin("a", KnitPinKind::Data, sig_float, 1.0);
+		new_node->add_output_pin("color", KnitPinKind::Data, sig_col);
+	} else if (tag == "break_color") {
+		KnitTypeSignature sig_col;
+		sig_col.kind = KnitDataType::Color;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_color", spawn_position);
+		new_node->add_input_pin("color", KnitPinKind::Data, sig_col);
+		new_node->add_output_pin("r", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("g", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("b", KnitPinKind::Data, sig_float);
+		new_node->add_output_pin("a", KnitPinKind::Data, sig_float);
+	} else if (tag == "make_rect2") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		KnitTypeSignature sig_rect2;
+		sig_rect2.kind = KnitDataType::Rect2;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_rect2", spawn_position);
+		new_node->add_input_pin("position", KnitPinKind::Data, sig_vec2);
+		new_node->add_input_pin("size", KnitPinKind::Data, sig_vec2);
+		new_node->add_output_pin("rect2", KnitPinKind::Data, sig_rect2);
+	} else if (tag == "break_rect2") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		KnitTypeSignature sig_rect2;
+		sig_rect2.kind = KnitDataType::Rect2;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_rect2", spawn_position);
+		new_node->add_input_pin("rect2", KnitPinKind::Data, sig_rect2);
+		new_node->add_output_pin("position", KnitPinKind::Data, sig_vec2);
+		new_node->add_output_pin("size", KnitPinKind::Data, sig_vec2);
+	} else if (tag == "make_transform2d") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		KnitTypeSignature sig_t2d;
+		sig_t2d.kind = KnitDataType::Transform2D;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_transform2d", spawn_position);
+		new_node->add_input_pin("rotation", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("origin", KnitPinKind::Data, sig_vec2);
+		new_node->add_output_pin("transform2d", KnitPinKind::Data, sig_t2d);
+	} else if (tag == "break_transform2d") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		KnitTypeSignature sig_t2d;
+		sig_t2d.kind = KnitDataType::Transform2D;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_transform2d", spawn_position);
+		new_node->add_input_pin("transform2d", KnitPinKind::Data, sig_t2d);
+		new_node->add_output_pin("origin", KnitPinKind::Data, sig_vec2);
+		new_node->add_output_pin("rotation", KnitPinKind::Data, sig_float);
+	} else if (tag == "make_transform3d") {
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		KnitTypeSignature sig_t3d;
+		sig_t3d.kind = KnitDataType::Transform3D;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "make_transform3d", spawn_position);
+		new_node->add_input_pin("rotation", KnitPinKind::Data, sig_vec3);
+		new_node->add_input_pin("origin", KnitPinKind::Data, sig_vec3);
+		new_node->add_output_pin("transform3d", KnitPinKind::Data, sig_t3d);
+	} else if (tag == "break_transform3d") {
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		KnitTypeSignature sig_t3d;
+		sig_t3d.kind = KnitDataType::Transform3D;
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "break_transform3d", spawn_position);
+		new_node->add_input_pin("transform3d", KnitPinKind::Data, sig_t3d);
+		new_node->add_output_pin("origin", KnitPinKind::Data, sig_vec3);
+		new_node->add_output_pin("rotation", KnitPinKind::Data, sig_vec3);
+		new_node->add_output_pin("scale", KnitPinKind::Data, sig_vec3);
+
+	// Dynamic ClassDB Methods, Properties, Signals
+	} else if (tag.begins_with("class_method:")) {
+		Vector<String> parts = tag.split(":");
+		if (parts.size() >= 3) {
+			StringName class_name = parts[1];
+			StringName method_name = parts[2];
+			MethodInfo mi;
+			if (ClassDB::get_method_info(class_name, method_name, &mi)) {
+				bool is_const = (mi.flags & METHOD_FLAG_CONST);
+				bool has_return = (mi.return_val.type != Variant::NIL);
+				KnitNodeCategory cat = (is_const && has_return) ? KnitNodeCategory::PureFunction : KnitNodeCategory::ImpureAction;
+
+				new_node = graph->create_node(cat, vformat("%s", String(method_name)), spawn_position);
+				new_node->target_symbol = method_name;
+
+				if (cat == KnitNodeCategory::ImpureAction) {
+					new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+				}
+
+				KnitTypeSignature target_sig;
+				target_sig.kind = KnitDataType::ObjectRef;
+				target_sig.custom_type_name = class_name;
+				new_node->add_input_pin("Target", KnitPinKind::Data, target_sig);
+
+				for (int a = 0; a < mi.arguments.size(); a++) {
+					const PropertyInfo &arg = mi.arguments[a];
+					new_node->add_input_pin(arg.name, KnitPinKind::Data, KnitTypeSignature::from_property_info(arg));
+				}
+
+				if (cat == KnitNodeCategory::ImpureAction) {
+					new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+				}
+
+				if (has_return) {
+					new_node->add_output_pin("Result", KnitPinKind::Data, KnitTypeSignature::from_property_info(mi.return_val));
+				}
+			}
+		}
+	} else if (tag.begins_with("class_prop_get:")) {
+		Vector<String> parts = tag.split(":");
+		if (parts.size() >= 3) {
+			StringName class_name = parts[1];
+			StringName prop_name = parts[2];
+			Variant::Type p_type = ClassDB::get_property_type(class_name, prop_name);
+
+			new_node = graph->create_node(KnitNodeCategory::PureFunction, vformat("Get %s", String(prop_name)), spawn_position);
+			new_node->target_symbol = prop_name;
+
+			KnitTypeSignature target_sig;
+			target_sig.kind = KnitDataType::ObjectRef;
+			target_sig.custom_type_name = class_name;
+			new_node->add_input_pin("Target", KnitPinKind::Data, target_sig);
+
+			KnitTypeSignature val_sig;
+			val_sig.kind = KnitTypeSignature::from_variant_type(p_type);
+			new_node->add_output_pin("Value", KnitPinKind::Data, val_sig);
+		}
+	} else if (tag.begins_with("class_prop_set:")) {
+		Vector<String> parts = tag.split(":");
+		if (parts.size() >= 3) {
+			StringName class_name = parts[1];
+			StringName prop_name = parts[2];
+			Variant::Type p_type = ClassDB::get_property_type(class_name, prop_name);
+
+			new_node = graph->create_node(KnitNodeCategory::ImpureAction, vformat("Set %s", String(prop_name)), spawn_position);
+			new_node->target_symbol = prop_name;
+
+			new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+
+			KnitTypeSignature target_sig;
+			target_sig.kind = KnitDataType::ObjectRef;
+			target_sig.custom_type_name = class_name;
+			new_node->add_input_pin("Target", KnitPinKind::Data, target_sig);
+
+			KnitTypeSignature val_sig;
+			val_sig.kind = KnitTypeSignature::from_variant_type(p_type);
+			new_node->add_input_pin("Value", KnitPinKind::Data, val_sig);
+
+			new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+		}
+	} else if (tag.begins_with("class_signal:")) {
+		Vector<String> parts = tag.split(":");
+		if (parts.size() >= 3) {
+			StringName class_name = parts[1];
+			StringName signal_name = parts[2];
+			MethodInfo sig_info;
+			ClassDB::get_signal(class_name, signal_name, &sig_info);
+
+			new_node = graph->create_node(KnitNodeCategory::Event, vformat("On %s", String(signal_name)), spawn_position);
+			new_node->target_symbol = signal_name;
+			new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+
+			for (int a = 0; a < sig_info.arguments.size(); a++) {
+				const PropertyInfo &arg = sig_info.arguments[a];
+				new_node->add_output_pin(arg.name, KnitPinKind::Data, KnitTypeSignature::from_property_info(arg));
+			}
+		}
+	} else if (tag == "flow_do_once") {
+		new_node = graph->create_node(KnitNodeCategory::FlowControl, "Do Once", spawn_position);
+		new_node->add_input_pin("In", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Reset", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Start Closed", KnitPinKind::Data, sig_bool, false);
+		new_node->add_output_pin("Out", KnitPinKind::Execution, sig_exec);
+	} else if (tag == "flow_flip_flop") {
+		new_node = graph->create_node(KnitNodeCategory::FlowControl, "Flip Flop", spawn_position);
+		new_node->add_input_pin("In", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("A", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("B", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Is A", KnitPinKind::Data, sig_bool);
+	} else if (tag == "flow_gate") {
+		new_node = graph->create_node(KnitNodeCategory::FlowControl, "Gate", spawn_position);
+		new_node->add_input_pin("In", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Open", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Close", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Toggle", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Start Closed", KnitPinKind::Data, sig_bool, false);
+		new_node->add_output_pin("Out", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Is Open", KnitPinKind::Data, sig_bool);
+	} else if (tag == "gameplay_char_move_jump_3d") {
+		KnitTypeSignature sig_vec2;
+		sig_vec2.kind = KnitDataType::Vector2;
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		KnitTypeSignature sig_body;
+		sig_body.kind = KnitDataType::ObjectRef;
+		sig_body.custom_type_name = "CharacterBody3D";
+
+		new_node = graph->create_node(KnitNodeCategory::ImpureAction, "Character Move & Jump 3D", spawn_position);
+		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Character", KnitPinKind::Data, sig_body);
+		new_node->add_input_pin("Input Dir", KnitPinKind::Data, sig_vec2, Vector2(0, 0));
+		new_node->add_input_pin("Speed", KnitPinKind::Data, sig_float, 5.0);
+		new_node->add_input_pin("Jump", KnitPinKind::Data, sig_bool, false);
+		new_node->add_input_pin("Jump Velocity", KnitPinKind::Data, sig_float, 4.5);
+		new_node->add_input_pin("Gravity", KnitPinKind::Data, sig_float, 9.8);
+		new_node->add_input_pin("Delta", KnitPinKind::Data, sig_float, 0.0166);
+		new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Is Grounded", KnitPinKind::Data, sig_bool);
+		new_node->add_output_pin("Velocity", KnitPinKind::Data, sig_vec3);
+	} else if (tag == "gameplay_raycast_3d") {
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		KnitTypeSignature sig_obj;
+		sig_obj.kind = KnitDataType::ObjectRef;
+
+		new_node = graph->create_node(KnitNodeCategory::ImpureAction, "Raycast Query 3D", spawn_position);
+		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Origin", KnitPinKind::Data, sig_vec3, Vector3(0, 0, 0));
+		new_node->add_input_pin("Target", KnitPinKind::Data, sig_vec3, Vector3(0, -10, 0));
+		new_node->add_input_pin("Collision Mask", KnitPinKind::Data, sig_int, 1);
+		new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Hit", KnitPinKind::Data, sig_bool);
+		new_node->add_output_pin("Hit Position", KnitPinKind::Data, sig_vec3);
+		new_node->add_output_pin("Hit Normal", KnitPinKind::Data, sig_vec3);
+		new_node->add_output_pin("Hit Collider", KnitPinKind::Data, sig_obj);
+	} else if (tag == "anim_tween_property") {
+		KnitTypeSignature sig_obj;
+		sig_obj.kind = KnitDataType::ObjectRef;
+
+		new_node = graph->create_node(KnitNodeCategory::ImpureAction, "Tween Property", spawn_position);
+		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Target", KnitPinKind::Data, sig_obj);
+		new_node->add_input_pin("Property", KnitPinKind::Data, sig_string, "position");
+		new_node->add_input_pin("Final Value", KnitPinKind::Data, sig_wild);
+		new_node->add_input_pin("Duration", KnitPinKind::Data, sig_float, 1.0);
+		new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+		new_node->add_output_pin("Tween", KnitPinKind::Data, sig_obj);
+	} else if (tag == "audio_play_sound_3d") {
+		KnitTypeSignature sig_vec3;
+		sig_vec3.kind = KnitDataType::Vector3;
+		KnitTypeSignature sig_res;
+		sig_res.kind = KnitDataType::ObjectRef;
+		sig_res.custom_type_name = "AudioStream";
+
+		new_node = graph->create_node(KnitNodeCategory::ImpureAction, "Play Sound 3D", spawn_position);
+		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
+		new_node->add_input_pin("Stream", KnitPinKind::Data, sig_res);
+		new_node->add_input_pin("Position", KnitPinKind::Data, sig_vec3, Vector3(0, 0, 0));
+		new_node->add_input_pin("Volume dB", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("Pitch Scale", KnitPinKind::Data, sig_float, 1.0);
+		new_node->add_output_pin("FlowOut", KnitPinKind::Execution, sig_exec);
+	} else if (tag == "flow_reroute") {
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "Reroute", spawn_position);
+		new_node->add_input_pin("In", KnitPinKind::Data, sig_wild);
+		new_node->add_output_pin("Out", KnitPinKind::Data, sig_wild);
+	} else if (tag == "math_expression") {
+		new_node = graph->create_node(KnitNodeCategory::PureFunction, "Math Expression", spawn_position);
+		new_node->target_symbol = "x + y";
+		new_node->add_input_pin("x", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_input_pin("y", KnitPinKind::Data, sig_float, 0.0);
+		new_node->add_output_pin("Result", KnitPinKind::Data, sig_float);
 	} else if (tag == "action_move_and_slide") {
 		new_node = graph->create_node(KnitNodeCategory::ImpureAction, "move_and_slide", spawn_position);
 		new_node->add_input_pin("FlowIn", KnitPinKind::Execution, sig_exec);
@@ -1083,10 +1573,229 @@ void KnitsEditorBase::_spawn_selected_palette_node() {
 	}
 
 	if (new_node.is_valid()) {
+		if (wire_drag_source_node != 0 && wire_drag_source_pin != 0) {
+			if (wire_drag_is_output) {
+				for (int i = 0; i < new_node->input_pins.size(); i++) {
+					const KnitPin &in_pin = new_node->input_pins[i];
+					if (wire_drag_pin_kind == KnitPinKind::Execution && in_pin.kind == KnitPinKind::Execution) {
+						graph->connect_pins(wire_drag_source_node, wire_drag_source_pin, new_node->id, in_pin.id);
+						break;
+					} else if (wire_drag_pin_kind == KnitPinKind::Data && in_pin.kind == KnitPinKind::Data) {
+						if (in_pin.type.kind == KnitDataType::Wildcard || wire_drag_data_type == KnitDataType::Wildcard || in_pin.type.kind == wire_drag_data_type) {
+							graph->connect_pins(wire_drag_source_node, wire_drag_source_pin, new_node->id, in_pin.id);
+							break;
+						}
+					}
+				}
+			} else {
+				for (int i = 0; i < new_node->output_pins.size(); i++) {
+					const KnitPin &out_pin = new_node->output_pins[i];
+					if (wire_drag_pin_kind == KnitPinKind::Execution && out_pin.kind == KnitPinKind::Execution) {
+						graph->connect_pins(new_node->id, out_pin.id, wire_drag_source_node, wire_drag_source_pin);
+						break;
+					} else if (wire_drag_pin_kind == KnitPinKind::Data && out_pin.kind == KnitPinKind::Data) {
+						if (out_pin.type.kind == KnitDataType::Wildcard || wire_drag_data_type == KnitDataType::Wildcard || out_pin.type.kind == wire_drag_data_type) {
+							graph->connect_pins(new_node->id, out_pin.id, wire_drag_source_node, wire_drag_source_pin);
+							break;
+						}
+					}
+				}
+			}
+			wire_drag_source_node = 0;
+			wire_drag_source_pin = 0;
+		}
+
 		_create_visual_node(new_node);
 		apply_code();
 		status_label->set_text(vformat("Spawned node: %s", new_node->title));
 	}
+}
+
+void KnitsEditorBase::_on_connection_to_empty(const StringName &p_from, int p_from_slot, const Vector2 &p_release_position) {
+	for (const KeyValue<KnitNodeID, GraphNode *> &E : visual_nodes) {
+		if (E.value && E.value->get_name() == p_from) {
+			wire_drag_source_node = E.key;
+			if (output_slot_to_pin.has(E.key) && p_from_slot >= 0 && p_from_slot < output_slot_to_pin[E.key].size()) {
+				wire_drag_source_pin = output_slot_to_pin[E.key][p_from_slot];
+				Ref<KnitNode> node = graph->get_node(E.key);
+				if (node.is_valid()) {
+					for (int i = 0; i < node->output_pins.size(); i++) {
+						if (node->output_pins[i].id == wire_drag_source_pin) {
+							wire_drag_pin_kind = node->output_pins[i].kind;
+							wire_drag_data_type = node->output_pins[i].type.kind;
+							break;
+						}
+					}
+				}
+			}
+			wire_drag_is_output = true;
+			break;
+		}
+	}
+
+	spawn_position = (p_release_position + graph_edit->get_scroll_offset()) / graph_edit->get_zoom();
+	_populate_palette_tree("");
+	search_box->clear();
+	quick_spawn_dialog->popup_centered_ratio(0.4);
+	search_box->grab_focus();
+}
+
+void KnitsEditorBase::_on_connection_from_empty(const StringName &p_to, int p_to_slot, const Vector2 &p_release_position) {
+	for (const KeyValue<KnitNodeID, GraphNode *> &E : visual_nodes) {
+		if (E.value && E.value->get_name() == p_to) {
+			wire_drag_source_node = E.key;
+			if (input_slot_to_pin.has(E.key) && p_to_slot >= 0 && p_to_slot < input_slot_to_pin[E.key].size()) {
+				wire_drag_source_pin = input_slot_to_pin[E.key][p_to_slot];
+				Ref<KnitNode> node = graph->get_node(E.key);
+				if (node.is_valid()) {
+					for (int i = 0; i < node->input_pins.size(); i++) {
+						if (node->input_pins[i].id == wire_drag_source_pin) {
+							wire_drag_pin_kind = node->input_pins[i].kind;
+							wire_drag_data_type = node->input_pins[i].type.kind;
+							break;
+						}
+					}
+				}
+			}
+			wire_drag_is_output = false;
+			break;
+		}
+	}
+
+	spawn_position = (p_release_position + graph_edit->get_scroll_offset()) / graph_edit->get_zoom();
+	_populate_palette_tree("");
+	search_box->clear();
+	quick_spawn_dialog->popup_centered_ratio(0.4);
+	search_box->grab_focus();
+}
+
+void KnitsEditorBase::_on_expression_text_submitted(const String &p_text, KnitNodeID p_node_id) {
+	if (graph.is_null()) return;
+	Ref<KnitNode> node = graph->get_node(p_node_id);
+	if (node.is_null()) return;
+
+	node->target_symbol = p_text;
+
+	// Extract unique variable identifiers from formula
+	HashSet<String> math_funcs;
+	math_funcs.insert("sin"); math_funcs.insert("cos"); math_funcs.insert("tan");
+	math_funcs.insert("asin"); math_funcs.insert("acos"); math_funcs.insert("atan"); math_funcs.insert("atan2");
+	math_funcs.insert("sqrt"); math_funcs.insert("abs"); math_funcs.insert("sign");
+	math_funcs.insert("floor"); math_funcs.insert("ceil"); math_funcs.insert("round");
+	math_funcs.insert("min"); math_funcs.insert("max"); math_funcs.insert("clamp");
+	math_funcs.insert("lerp"); math_funcs.insert("remap"); math_funcs.insert("smoothstep");
+	math_funcs.insert("pow"); math_funcs.insert("pi"); math_funcs.insert("tau"); math_funcs.insert("e");
+
+	Vector<String> vars;
+	int pos = 0;
+	while (pos < p_text.length()) {
+		char32_t c = p_text[pos];
+		if (is_unicode_identifier_start(c) || c == '_') {
+			int start = pos;
+			while (pos < p_text.length() && (is_unicode_identifier_continue(p_text[pos]) || p_text[pos] == '_')) {
+				pos++;
+			}
+			String ident = p_text.substr(start, pos - start);
+			if (!math_funcs.has(ident.to_lower()) && !vars.has(ident)) {
+				vars.push_back(ident);
+			}
+		} else {
+			pos++;
+		}
+	}
+
+	KnitTypeSignature sig_float;
+	sig_float.kind = KnitDataType::Float;
+
+	// Remove old pins not in vars
+	for (int i = node->input_pins.size() - 1; i >= 0; i--) {
+		if (!vars.has(node->input_pins[i].name)) {
+			KnitPinID pin_id = node->input_pins[i].id;
+			graph->disconnect_pins(0, pin_id);
+			node->remove_pin(pin_id);
+		}
+	}
+
+	// Add new pins for new vars
+	for (int i = 0; i < vars.size(); i++) {
+		bool exists = false;
+		for (int j = 0; j < node->input_pins.size(); j++) {
+			if (node->input_pins[j].name == vars[i]) {
+				exists = true;
+				break;
+			}
+		}
+		if (!exists) {
+			node->add_input_pin(vars[i], KnitPinKind::Data, sig_float, 0.0);
+		}
+	}
+
+	_update_graph_view();
+	apply_code();
+	status_label->set_text(vformat("Expression formula updated: %s", p_text));
+}
+
+void KnitsEditorBase::_on_add_pin_pressed(KnitNodeID p_node_id) {
+	if (graph.is_null()) return;
+	Ref<KnitNode> node = graph->get_node(p_node_id);
+	if (node.is_null()) return;
+
+	String title = node->title;
+	if (title == "array_construct" || title == "format_str" || title == "str") {
+		KnitTypeSignature sig_wild;
+		sig_wild.kind = KnitDataType::Wildcard;
+		int idx = node->input_pins.size();
+		node->add_input_pin(vformat("elem%d", idx), KnitPinKind::Data, sig_wild);
+	} else if (title == "dict_construct") {
+		KnitTypeSignature sig_str;
+		sig_str.kind = KnitDataType::String;
+		KnitTypeSignature sig_wild;
+		sig_wild.kind = KnitDataType::Wildcard;
+		int idx = node->input_pins.size() / 2;
+		node->add_input_pin(vformat("key%d", idx), KnitPinKind::Data, sig_str, vformat("key%d", idx));
+		node->add_input_pin(vformat("val%d", idx), KnitPinKind::Data, sig_wild);
+	} else if (title == "Sequence") {
+		KnitTypeSignature sig_exec;
+		sig_exec.kind = KnitDataType::Execution;
+		int idx = node->output_pins.size();
+		node->add_output_pin(vformat("Then %d", idx), KnitPinKind::Execution, sig_exec);
+	}
+
+	_update_graph_view();
+	apply_code();
+}
+
+void KnitsEditorBase::_on_remove_pin_pressed(KnitNodeID p_node_id) {
+	if (graph.is_null()) return;
+	Ref<KnitNode> node = graph->get_node(p_node_id);
+	if (node.is_null()) return;
+
+	String title = node->title;
+	if (title == "array_construct" || title == "format_str" || title == "str") {
+		if (node->input_pins.size() > 1) {
+			KnitPinID last_pin = node->input_pins[node->input_pins.size() - 1].id;
+			graph->disconnect_pins(0, last_pin);
+			node->remove_pin(last_pin);
+		}
+	} else if (title == "dict_construct") {
+		if (node->input_pins.size() > 2) {
+			KnitPinID val_pin = node->input_pins[node->input_pins.size() - 1].id;
+			KnitPinID key_pin = node->input_pins[node->input_pins.size() - 2].id;
+			graph->disconnect_pins(0, val_pin);
+			graph->disconnect_pins(0, key_pin);
+			node->remove_pin(val_pin);
+			node->remove_pin(key_pin);
+		}
+	} else if (title == "Sequence") {
+		if (node->output_pins.size() > 1) {
+			KnitPinID last_pin = node->output_pins[node->output_pins.size() - 1].id;
+			graph->disconnect_pins(last_pin, 0);
+			node->remove_pin(last_pin);
+		}
+	}
+
+	_update_graph_view();
+	apply_code();
 }
 
 void KnitsEditorBase::ensure_focus() {
@@ -1201,6 +1910,8 @@ KnitsEditorBase::KnitsEditorBase() {
 	graph_edit->set_connection_lines_antialiased(true);
 	graph_edit->connect("connection_request", callable_mp(this, &KnitsEditorBase::_on_connection_request));
 	graph_edit->connect("disconnection_request", callable_mp(this, &KnitsEditorBase::_on_disconnection_request));
+	graph_edit->connect("connection_to_empty", callable_mp(this, &KnitsEditorBase::_on_connection_to_empty));
+	graph_edit->connect("connection_from_empty", callable_mp(this, &KnitsEditorBase::_on_connection_from_empty));
 	graph_edit->connect("delete_nodes_request", callable_mp(this, &KnitsEditorBase::_on_delete_nodes_request));
 	graph_edit->connect("node_selected", callable_mp(this, &KnitsEditorBase::_on_node_selected));
 	graph_edit->connect("node_deselected", callable_mp(this, &KnitsEditorBase::_on_node_deselected));

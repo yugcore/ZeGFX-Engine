@@ -65,6 +65,30 @@ enum class KnitOpcode : uint8_t {
 	VEC3_DOT,        // R[dst] = Vector3(R[src_a]).dot(Vector3(R[src_b]))
 	VEC3_CROSS,      // R[dst] = Vector3(R[src_a]).cross(Vector3(R[src_b]))
 
+	// Struct & Component Assembly (Make / Break)
+	MAKE_VEC2,        // R[dst] = Vector2(R[src_a], R[src_b])
+	BREAK_VEC2,       // R[dst] = Vec2(R[src_a]).x, R[dst+1] = Vec2(R[src_a]).y
+	MAKE_VEC3,        // R[dst] = Vector3(R[src_a], R[src_b], R[extra])
+	BREAK_VEC3,       // R[dst] = Vec3(R[src_a]).x, R[dst+1] = y, R[dst+2] = z
+	MAKE_VEC4,        // R[dst] = Vector4(R[src_a], R[src_b], R[src_b+1], R[src_b+2])
+	BREAK_VEC4,       // R[dst..dst+3] = Vector4 components (x, y, z, w)
+	MAKE_COLOR,       // R[dst] = Color(R[src_a], R[src_b], R[src_b+1], R[src_b+2])
+	BREAK_COLOR,      // R[dst..dst+3] = Color components (r, g, b, a)
+	MAKE_RECT2,       // R[dst] = Rect2(R[src_a], R[src_b])
+	BREAK_RECT2,      // R[dst] = Rect2.position, R[dst+1] = Rect2.size
+	MAKE_TRANSFORM2D, // R[dst] = Transform2D(R[src_a], R[src_b])
+	BREAK_TRANSFORM2D,// R[dst] = origin, R[dst+1] = rotation/scale
+	MAKE_TRANSFORM3D, // R[dst] = Transform3D(Basis(R[src_a]), Vector3(R[src_b]))
+	BREAK_TRANSFORM3D,// R[dst] = origin, R[dst+1] = basis/euler, R[dst+2] = scale
+
+	// Property & Member Accessors
+	GET_PROP,         // R[dst] = Target(R[src_a]).get(prop_name[imm32])
+	SET_PROP,         // Target(R[src_a]).set(prop_name[imm32], R[src_b])
+
+	// Logic & Selection
+	SELECT,           // R[dst] = bool(R[src_a]) ? R[src_b] : R[extra]
+	FORMAT_STR,       // R[dst] = String concatenation of R[src_a..src_a+extra-1]
+
 	// Containers & Indexing
 	GET_INDEXED,     // R[dst] = R[src_a][R[src_b]]
 	SET_INDEXED,     // R[src_a][R[src_b]] = R[extra]
@@ -102,6 +126,16 @@ enum class KnitOpcode : uint8_t {
 	YIELD_FRAMES,    // Suspend VM state for N frames (R[src_a])
 	YIELD_SECONDS,   // Suspend VM state for DeltaTime accumulator (R[src_a])
 	RETURN,          // Return from function with R[src_a]
+
+	// High-Level Gameplay & Flow Nodes (Part 3)
+	DO_ONCE,         // Stateful Do-Once gate: R[src_a] = reset, jumps if already executed
+	FLIP_FLOP,       // Stateful alternating A/B gate: R[dst] = is_A, jumps to B on alternate
+	GATE,            // Stateful Open/Close gate
+	MULTI_GATE,      // Sequential/Random multi-output gate
+	CHAR_MOVE_JUMP_3D,// Kinematic movement & jump integration for CharacterBody3D
+	RAYCAST_3D,      // Direct physics raycast query
+	TWEEN_PROP,      // SceneTree tween property creation
+	PLAY_SOUND_3D,   // 3D Audio one-shot player
 
 	// Debug & Fault Traps
 	DEBUG_TRAP       // Breakpoint check with KnitNodeID in imm_u64/imm32

@@ -34,6 +34,7 @@ class KnitsBytecodeVM {
 private:
 	HashMap<KnitFrameKey, KnitExecutionFrame, KnitFrameKeyHasher> suspended_frames;
 	HashSet<KnitNodeID> breakpoints;
+	HashMap<uint64_t, Variant> node_states; // Node ID -> persistent state (Do Once, Flip Flop, Gate, etc.)
 	KnitVMFault last_fault;
 	bool fault_occurred = false;
 

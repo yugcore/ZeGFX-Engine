@@ -170,6 +170,61 @@ struct KnitTypeSignature {
 			default: return KnitDataType::Void;
 		}
 	}
+
+	_FORCE_INLINE_ static Variant::Type to_variant_type(KnitDataType p_type) {
+		switch (p_type) {
+			case KnitDataType::Bool: return Variant::BOOL;
+			case KnitDataType::Int32:
+			case KnitDataType::Int64: return Variant::INT;
+			case KnitDataType::Float:
+			case KnitDataType::Double: return Variant::FLOAT;
+			case KnitDataType::String: return Variant::STRING;
+			case KnitDataType::StringName: return Variant::STRING_NAME;
+			case KnitDataType::Vector2: return Variant::VECTOR2;
+			case KnitDataType::Vector2i: return Variant::VECTOR2I;
+			case KnitDataType::Rect2: return Variant::RECT2;
+			case KnitDataType::Rect2i: return Variant::RECT2I;
+			case KnitDataType::Vector3: return Variant::VECTOR3;
+			case KnitDataType::Vector3i: return Variant::VECTOR3I;
+			case KnitDataType::Transform2D: return Variant::TRANSFORM2D;
+			case KnitDataType::Vector4: return Variant::VECTOR4;
+			case KnitDataType::Vector4i: return Variant::VECTOR4I;
+			case KnitDataType::Plane: return Variant::PLANE;
+			case KnitDataType::Quaternion: return Variant::QUATERNION;
+			case KnitDataType::AABB: return Variant::AABB;
+			case KnitDataType::Basis: return Variant::BASIS;
+			case KnitDataType::Transform3D: return Variant::TRANSFORM3D;
+			case KnitDataType::Projection: return Variant::PROJECTION;
+			case KnitDataType::Color: return Variant::COLOR;
+			case KnitDataType::NodePath: return Variant::NODE_PATH;
+			case KnitDataType::RID: return Variant::RID;
+			case KnitDataType::ObjectRef: return Variant::OBJECT;
+			case KnitDataType::Callable: return Variant::CALLABLE;
+			case KnitDataType::Signal: return Variant::SIGNAL;
+			case KnitDataType::Dictionary: return Variant::DICTIONARY;
+			case KnitDataType::Array: return Variant::ARRAY;
+			case KnitDataType::PackedByteArray: return Variant::PACKED_BYTE_ARRAY;
+			case KnitDataType::PackedInt32Array: return Variant::PACKED_INT32_ARRAY;
+			case KnitDataType::PackedInt64Array: return Variant::PACKED_INT64_ARRAY;
+			case KnitDataType::PackedFloat32Array: return Variant::PACKED_FLOAT32_ARRAY;
+			case KnitDataType::PackedFloat64Array: return Variant::PACKED_FLOAT64_ARRAY;
+			case KnitDataType::PackedStringArray: return Variant::PACKED_STRING_ARRAY;
+			case KnitDataType::PackedVector2Array: return Variant::PACKED_VECTOR2_ARRAY;
+			case KnitDataType::PackedVector3Array: return Variant::PACKED_VECTOR3_ARRAY;
+			case KnitDataType::PackedColorArray: return Variant::PACKED_COLOR_ARRAY;
+			case KnitDataType::PackedVector4Array: return Variant::PACKED_VECTOR4_ARRAY;
+			default: return Variant::NIL;
+		}
+	}
+
+	_FORCE_INLINE_ static KnitTypeSignature from_property_info(const PropertyInfo &p_info) {
+		KnitTypeSignature sig;
+		sig.kind = from_variant_type(p_info.type);
+		if (p_info.type == Variant::OBJECT && p_info.class_name != StringName()) {
+			sig.custom_type_name = p_info.class_name;
+		}
+		return sig;
+	}
 };
 
 // Resumable Coroutine State-Machine Frame Data (Tier 1 Architecture)
