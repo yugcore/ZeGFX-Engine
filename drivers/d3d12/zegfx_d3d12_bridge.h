@@ -20,12 +20,14 @@
 
 class DXRPipelineD3D12;
 class PostCompositeD3D12;
+class VolumetricsPassD3D12;
 
 namespace zegfx {
 class RenderGraph;
 class ZPostProcessScheduler;
 class VirtualGeometryManager;
 class ZCullingContext;
+class ZSubmissionContext;
 } // namespace zegfx
 
 // Bridge singleton wiring ZeGFX subsystems into Godot's
@@ -38,12 +40,14 @@ private:
 	bool device_initialized = false;
 	DXRPipelineD3D12 *dxr_pipeline = nullptr;
 	PostCompositeD3D12 *post_composite = nullptr;
+	VolumetricsPassD3D12 *volumetrics_pass = nullptr;
 
 	// --- Render graph & GPU culling subsystems (owned) ---
 	zegfx::RenderGraph *frame_render_graph = nullptr;
 	zegfx::ZPostProcessScheduler *post_scheduler = nullptr;
 	zegfx::VirtualGeometryManager *virtual_geom_manager = nullptr;
 	zegfx::ZCullingContext *culling_context = nullptr;
+	zegfx::ZSubmissionContext *submission_context = nullptr;
 
 	struct CullingViewData {
 		Transform3D cam_transform;
@@ -127,9 +131,10 @@ public:
 	zegfx::ZCullingContext *get_culling_context() const { return culling_context; }
 
 	// Query whether ZeGFX passes should replace Godot's equivalents this frame
-	bool ao_pass_active() const { return initialized; }
+	bool ao_pass_active() const { return initialized && active_cmd_list_attached; }
 	bool dxr_reflections_active() const;
 	bool has_dxr_reflections_succeeded() const { return dxr_reflections_succeeded; }
+	bool post_composite_active() const { return initialized && post_composite != nullptr; }
 
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
 	bool execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits);

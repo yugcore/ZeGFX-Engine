@@ -34,6 +34,23 @@ struct DXCHelper {
             dxc_module = LoadLibraryW(L"bin/dxcompiler.dll");
         }
 
+        if (!dxil_module || !dxc_module) {
+            WCHAR exe_path[MAX_PATH];
+            if (GetModuleFileNameW(nullptr, exe_path, MAX_PATH)) {
+                WCHAR *last_slash = wcsrchr(exe_path, L'\\');
+                if (last_slash) {
+                    *(last_slash + 1) = L'\0';
+                    std::wstring exe_dir = exe_path;
+                    if (!dxil_module) {
+                        dxil_module = LoadLibraryW((exe_dir + L"dxil.dll").c_str());
+                    }
+                    if (!dxc_module) {
+                        dxc_module = LoadLibraryW((exe_dir + L"dxcompiler.dll").c_str());
+                    }
+                }
+            }
+        }
+
         if (!dxc_module) {
             return false;
         }
@@ -78,6 +95,22 @@ struct DXCHelper {
         IDxcBlobEncoding* source_blob = nullptr;
         hr = utils->LoadFile(file_path.c_str(), nullptr, &source_blob);
         if (FAILED(hr) || !source_blob) {
+            WCHAR exe_path[MAX_PATH];
+            if (GetModuleFileNameW(nullptr, exe_path, MAX_PATH)) {
+                WCHAR *last_slash = wcsrchr(exe_path, L'\\');
+                if (last_slash) {
+                    *last_slash = L'\0';
+                    WCHAR *parent_slash = wcsrchr(exe_path, L'\\');
+                    std::wstring root_dir = exe_path;
+                    if (parent_slash) {
+                        root_dir = std::wstring(exe_path, parent_slash - exe_path);
+                    }
+                    std::wstring alt_path = root_dir + L"/" + file_path;
+                    hr = utils->LoadFile(alt_path.c_str(), nullptr, &source_blob);
+                }
+            }
+        }
+        if (FAILED(hr) || !source_blob) {
             compiler->Release();
             utils->Release();
             return false;
@@ -110,6 +143,13 @@ struct DXCHelper {
             result->GetStatus(&status);
             if (SUCCEEDED(status)) {
                 result->GetResult(out_blob);
+            } else {
+                IDxcBlobEncoding* error_blob = nullptr;
+                result->GetErrorBuffer(&error_blob);
+                if (error_blob && error_blob->GetBufferSize() > 0) {
+                    std::cerr << "[ZeGFX DXC Shader Error] " << static_cast<const char*>(error_blob->GetBufferPointer()) << std::endl;
+                    error_blob->Release();
+                }
             }
             result->Release();
         }
@@ -321,6 +361,7 @@ bool DXRPipelineD3D12::create_raytracing_state_object() {
     miss_blob->Release();
 
     if (FAILED(hr) || !rtx_state_object) {
+        std::cerr << "[ZeGFX D3D12] CreateStateObject failed with HRESULT 0x" << std::hex << hr << std::dec << std::endl;
         return false;
     }
 

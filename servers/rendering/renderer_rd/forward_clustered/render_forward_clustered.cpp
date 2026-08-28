@@ -1515,11 +1515,10 @@ void RenderForwardClustered::_process_ssr(Ref<RenderSceneBuffersRD> p_render_buf
 #if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
 		Size2i size = p_render_buffers->get_internal_size();
-		ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, 0.5f);
-
-		// ZeGFX DXR reflections replace Godot's SSR when DXR ray dispatch has successfully executed
-		if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active() && ZeGFXD3D12Bridge::get_singleton()->has_dxr_reflections_succeeded()) {
-			return;
+		if (ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, 0.5f)) {
+			if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active()) {
+				return;
+			}
 		}
 	}
 #endif

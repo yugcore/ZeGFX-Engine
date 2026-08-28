@@ -3,6 +3,7 @@
 #include "core/variant/variant.h"
 #include "drivers/d3d12/dxr_pipeline.h"
 #include "drivers/d3d12/post_composite.h"
+#include "drivers/d3d12/volumetrics_pass.h"
 #include "final_image_settings.h"
 #include "raytraced_effects.h"
 #include "render_graph.h"
@@ -76,12 +77,28 @@ bool ZeGFXD3D12Bridge::initialize_device(void *p_d3d12_device) {
 	culling_context = new zegfx::ZCullingContext();
 	culling_context->Initialize(static_cast<ID3D12Device *>(p_d3d12_device), 65536);
 
+	submission_context = new zegfx::ZSubmissionContext();
+	submission_context->Initialize(static_cast<ID3D12Device *>(p_d3d12_device));
+
+	volumetrics_pass = new VolumetricsPassD3D12();
+	volumetrics_pass->initialize(static_cast<ID3D12Device *>(p_d3d12_device));
+
 	device_initialized = true;
-	print_line("[ZeGFX] D3D12 Device subsystems initialized (DXR pipeline + PostComposite + RenderGraph + PostScheduler + VirtualGeometry/Cull active).");
+	print_line("[ZeGFX] D3D12 Device subsystems initialized (DXR pipeline + PostComposite + Volumetrics + RenderGraph + PostScheduler + VirtualGeometry/Cull + Meshlet Submission active).");
 	return true;
 }
 
 void ZeGFXD3D12Bridge::shutdown() {
+	if (volumetrics_pass) {
+		volumetrics_pass->shutdown();
+		delete volumetrics_pass;
+		volumetrics_pass = nullptr;
+	}
+	if (submission_context) {
+		submission_context->Shutdown();
+		delete submission_context;
+		submission_context = nullptr;
+	}
 	if (culling_context) {
 		culling_context->Shutdown();
 		delete culling_context;
@@ -324,6 +341,16 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list));
 	}
 
+	// Phase 5: Execute GPU-driven indirect draw dispatch for queued .zmesh streams
+	if (submission_context && culling_context && p_cmd_list && !pending_meshlet_streams.is_empty()) {
+		ID3D12GraphicsCommandList *cmd = static_cast<ID3D12GraphicsCommandList *>(p_cmd_list);
+		ID3D12Resource *cull_buf = culling_context->GetCullBuffer();
+		ID3D12Resource *vis_buf = culling_context->GetVisibleBuffer();
+		if (cull_buf && vis_buf) {
+			submission_context->RecordIndirectDraw(cmd, cull_buf, vis_buf, static_cast<uint32_t>(pending_meshlet_streams.size()));
+		}
+	}
+
 	bool has_work = pending_ao.dirty || pending_dxr_reflections.dirty ||
 			pending_post_process.dirty || pending_meshlet_streams.size() > 0;
 
@@ -397,6 +424,13 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		dxr_reflections_succeeded = true;
 	} else {
 		dxr_reflections_succeeded = false;
+	}
+
+	// Execute 3D Froxel Volumetric Fog integration
+	if (volumetrics_pass && volumetrics_pass->is_initialized() && p_cmd_list) {
+		volumetrics_pass->dispatch_volumetric_fog(
+				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
+				nullptr, nullptr, static_cast<uint32_t>(p_width), static_cast<uint32_t>(p_height));
 	}
 
 	// Execute the post-processing chain with the targets (when available)

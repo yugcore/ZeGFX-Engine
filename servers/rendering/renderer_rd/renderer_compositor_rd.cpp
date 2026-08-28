@@ -37,6 +37,9 @@
 #include "servers/display/display_server.h"
 #include "servers/rendering/renderer_rd/forward_clustered/render_forward_clustered.h"
 #include "servers/rendering/renderer_rd/forward_mobile/render_forward_mobile.h"
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+#include "servers/rendering/renderer_rd/renderer_scene_d3d12.h"
+#endif
 #include "servers/rendering/rendering_server_types.h"
 
 void RendererCompositorRD::blit_render_targets_to_screen(DisplayServerEnums::WindowID p_screen, const RenderingServerTypes::BlitToScreen *p_render_targets, int p_amount) {
@@ -374,6 +377,12 @@ RendererCompositorRD::RendererCompositorRD() {
 	String rendering_method = OS::get_singleton()->get_current_rendering_method();
 	uint64_t textures_per_stage = RD::get_singleton()->limit_get(RD::LIMIT_MAX_TEXTURES_PER_SHADER_STAGE);
 
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+	String rendering_driver = OS::get_singleton()->get_current_rendering_driver_name();
+	if (rendering_driver == "d3d12") {
+		scene = memnew(RendererSceneD3D12());
+	} else
+#endif
 	if (rendering_method == "mobile" || textures_per_stage < 48) {
 		if (rendering_method == "forward_plus") {
 			WARN_PRINT_ONCE("Platform supports less than 48 textures per stage which is less than required by the Clustered renderer. Defaulting to Mobile renderer.");

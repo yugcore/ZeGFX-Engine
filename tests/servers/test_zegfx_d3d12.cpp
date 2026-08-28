@@ -24,8 +24,10 @@ TEST_CASE("[ZeGFX][D3D12] Render Graph DAG Builder and Resource Barriers") {
     SUBCASE("Check physical resource registration") {
         zegfx::RenderResourceId id = graph.registerPhysicalResource(
             "TestBuffer", zegfx::RenderResourceType::Buffer, nullptr, zegfx::RenderResourceState::Unknown);
-        CHECK(id != 0);
         CHECK(graph.getResource(id).name == "TestBuffer");
+        zegfx::RenderResourceId found_id = 0;
+        CHECK(graph.findResource("TestBuffer", found_id));
+        CHECK(found_id == id);
     }
 }
 #endif
