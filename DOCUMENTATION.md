@@ -73,17 +73,22 @@ ZeGFX features an engine-wide **Unified Graphics Quality Preset** architecture s
 ### How to Control Presets in Editor & Code
 
 1. **In the 3D Viewport Header**:
-   * Click **`[View]`** (top-left of 3D Viewport) -> **`Quality Preset...`** -> Select **`Low`**, **`Medium`**, **`High`**, or **`Ultra`**.
+   * Click **`[View]`** (top-left of 3D Viewport) -> **`Quality Preset...`** -> Select **`Low`**, **`Medium`**, **`High`**, **`Ultra`**, or **`Cinematic (Maximum Fidelity)`**.
+   * Click **`Resolution Scale...`** -> Select **`50% (Half)`**, **`75%`**, **`100% (Native)`**, **`125%`**, **`150%`**, or **`200% (Cinematic 2x SSAA Extreme Detail)`**.
+   * Click **`Anti-Aliasing...`** -> Select **`TAA (Subpixel Halton Jitter)`**, **`MSAA 8X`**, or **`FXAA`**.
+   * Click **`Mesh Detail (LOD)...`** -> Select **`Full Geometric Detail (LOD 0 Lossless - 0.0px)`** for zero LOD degradation across the entire camera frustum.
+   * Click **`Shadow Atlas...`** -> Select up to **`16384 (Cinematic Extreme)`** and toggle **`32-Bit Float Depth Precision`**.
+   * Click **`Anisotropic Filtering...`** -> Select up to **`16X (Maximum Texture Clarity)`**.
    * An on-screen notification toast will confirm the switch with instant real-time visual feedback.
 2. **In Project Settings**:
-   * Open **Project Settings -> Rendering -> Quality -> Preset** -> Choose default starting preset.
+   * Open **Project Settings -> Rendering -> Quality -> Preset** -> Choose default starting preset (`Low`, `Medium`, `High`, `Ultra`, `Cinematic`).
 3. **In GDScript / Runtime**:
    ```gdscript
    extends Node
 
    func _ready():
-       # Switch to Ultra Preset
-       RenderingServer.graphics_preset_apply(RenderingServer.GRAPHICS_PRESET_ULTRA)
+       # Switch to Cinematic Maximum Fidelity Preset
+       RenderingServer.graphics_preset_apply(RenderingServer.GRAPHICS_PRESET_CINEMATIC)
        print("Current Graphics Preset: ", RenderingServer.graphics_preset_get())
    ```
 

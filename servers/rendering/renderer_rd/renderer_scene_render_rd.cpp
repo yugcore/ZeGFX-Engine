@@ -1324,12 +1324,17 @@ void RendererSceneRenderRD::directional_soft_shadow_filter_set_quality(RSE::Shad
 
 void RendererSceneRenderRD::graphics_preset_apply(RSE::GraphicsPreset p_preset) {
 	current_graphics_preset = p_preset;
+	RendererRD::LightStorage *light_storage = RendererRD::LightStorage::get_singleton();
 	switch (p_preset) {
 		case RSE::GRAPHICS_PRESET_LOW: {
 			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_LOW);
 			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_LOW);
+			if (light_storage) {
+				light_storage->directional_shadow_atlas_set_size(2048, true);
+			}
 			environment_set_volumetric_fog_volume_size(32, 32);
 			environment_set_volumetric_fog_filter_active(false);
+			gi_set_use_half_resolution(true);
 			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_LOW);
 			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS);
 			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS);
@@ -1344,8 +1349,12 @@ void RendererSceneRenderRD::graphics_preset_apply(RSE::GraphicsPreset p_preset) 
 		case RSE::GRAPHICS_PRESET_MEDIUM: {
 			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_MEDIUM);
 			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_MEDIUM);
+			if (light_storage) {
+				light_storage->directional_shadow_atlas_set_size(4096, true);
+			}
 			environment_set_volumetric_fog_volume_size(64, 64);
 			environment_set_volumetric_fog_filter_active(true);
+			gi_set_use_half_resolution(true);
 			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_MEDIUM);
 			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS);
 			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS);
@@ -1360,8 +1369,12 @@ void RendererSceneRenderRD::graphics_preset_apply(RSE::GraphicsPreset p_preset) 
 		case RSE::GRAPHICS_PRESET_HIGH: {
 			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_HIGH);
 			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_HIGH);
+			if (light_storage) {
+				light_storage->directional_shadow_atlas_set_size(4096, false);
+			}
 			environment_set_volumetric_fog_volume_size(128, 64);
 			environment_set_volumetric_fog_filter_active(true);
+			gi_set_use_half_resolution(false);
 			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_HIGH);
 			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
 			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
@@ -1376,8 +1389,32 @@ void RendererSceneRenderRD::graphics_preset_apply(RSE::GraphicsPreset p_preset) 
 		case RSE::GRAPHICS_PRESET_ULTRA: {
 			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
 			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+			if (light_storage) {
+				light_storage->directional_shadow_atlas_set_size(8192, false);
+			}
 			environment_set_volumetric_fog_volume_size(256, 128);
 			environment_set_volumetric_fog_filter_active(true);
+			gi_set_use_half_resolution(false);
+			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_HIGH);
+			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
+			material_set_use_debanding(true);
+			screen_space_roughness_limiter_set_active(true, 0.45, 0.25);
+			glow_bicubic_upscale = true;
+			if (RSG::camera_attributes) {
+				RSG::camera_attributes->camera_attributes_set_dof_blur_bokeh_shape(RSE::DOF_BOKEH_CIRCLE);
+				RSG::camera_attributes->camera_attributes_set_dof_blur_quality(RSE::DOF_BLUR_QUALITY_HIGH, true);
+			}
+		} break;
+		case RSE::GRAPHICS_PRESET_CINEMATIC: {
+			directional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+			positional_soft_shadow_filter_set_quality(RSE::SHADOW_QUALITY_SOFT_ULTRA);
+			if (light_storage) {
+				light_storage->directional_shadow_atlas_set_size(8192, false);
+			}
+			environment_set_volumetric_fog_volume_size(256, 128);
+			environment_set_volumetric_fog_filter_active(true);
+			gi_set_use_half_resolution(false);
 			sub_surface_scattering_set_quality(RSE::SUB_SURFACE_SCATTERING_QUALITY_HIGH);
 			decals_set_filter(RSE::DECAL_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);
 			light_projectors_set_filter(RSE::LIGHT_PROJECTOR_FILTER_LINEAR_MIPMAPS_ANISOTROPIC);

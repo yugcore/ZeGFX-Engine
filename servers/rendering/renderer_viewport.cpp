@@ -279,9 +279,10 @@ void RendererViewport::_configure_3d_render_buffers(Viewport *p_viewport) {
 			p_viewport->internal_size = Size2(render_width, render_height);
 			p_viewport->jitter_phase_count = jitter_phase_count;
 
-			// At resolution scales lower than 1.0, use negative texture mipmap bias
-			// to compensate for the loss of sharpness.
-			const float texture_mipmap_bias = std::log2(MIN(scaling_3d_scale, 1.0)) + p_viewport->texture_mipmap_bias;
+			// At resolution scales differing from 1.0, use negative texture mipmap bias
+			// to compensate for upscaling blur or to exploit higher sample density in supersampling.
+			const float effective_scale = (scaling_3d_scale <= 1.0f) ? scaling_3d_scale : (1.0f / scaling_3d_scale);
+			const float texture_mipmap_bias = std::log2(MAX(effective_scale, 0.001f)) + p_viewport->texture_mipmap_bias;
 
 			RenderSceneBuffersConfiguration rb_config;
 			rb_config.set_render_target(p_viewport->render_target);

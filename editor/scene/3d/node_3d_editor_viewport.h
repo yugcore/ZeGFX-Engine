@@ -175,6 +175,40 @@ class Node3DEditorViewport : public Control {
 		VIEW_QUALITY_MEDIUM,
 		VIEW_QUALITY_HIGH,
 		VIEW_QUALITY_ULTRA,
+		VIEW_QUALITY_CINEMATIC,
+
+		VIEW_RES_SCALE_50,
+		VIEW_RES_SCALE_75,
+		VIEW_RES_SCALE_100,
+		VIEW_RES_SCALE_125,
+		VIEW_RES_SCALE_150,
+		VIEW_RES_SCALE_200,
+
+		VIEW_AA_DISABLED,
+		VIEW_AA_FXAA,
+		VIEW_AA_TAA,
+		VIEW_AA_MSAA_2X,
+		VIEW_AA_MSAA_4X,
+		VIEW_AA_MSAA_8X,
+
+		VIEW_LOD_FULL_DETAIL,
+		VIEW_LOD_HIGH,
+		VIEW_LOD_NORMAL,
+		VIEW_LOD_PERFORMANCE,
+
+		VIEW_SHADOW_ATLAS_2048,
+		VIEW_SHADOW_ATLAS_4096,
+		VIEW_SHADOW_ATLAS_8192,
+		VIEW_SHADOW_ATLAS_16384,
+		VIEW_SHADOW_32BIT,
+
+		VIEW_ANISO_DISABLED,
+		VIEW_ANISO_2X,
+		VIEW_ANISO_4X,
+		VIEW_ANISO_8X,
+		VIEW_ANISO_16X,
+
+		VIEW_DEBANDING,
 
 		// < Keep in sync with menu.
 		VIEW_DISPLAY_NORMAL,
@@ -371,6 +405,14 @@ private:
 
 	PopupMenu *selection_menu = nullptr;
 	PopupMenu *quality_submenu = nullptr;
+	PopupMenu *resolution_scale_submenu = nullptr;
+	PopupMenu *anti_aliasing_submenu = nullptr;
+	PopupMenu *mesh_lod_submenu = nullptr;
+	PopupMenu *shadow_atlas_submenu = nullptr;
+	PopupMenu *anisotropic_submenu = nullptr;
+
+	void _apply_viewport_quality(RSE::GraphicsPreset p_preset);
+	void _update_viewport_quality_ui();
 
 	enum TransformMode {
 		TRANSFORM_NONE,

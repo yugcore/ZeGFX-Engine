@@ -309,7 +309,7 @@ graph LR
 | Feature | Completion % | Maturity | Actual State & Brutal Reality |
 |---|---|---|---|
 | In-engine editor with live preview | 95% | 🟢 Production | World-class built-in editor with live scene inspection and remote debugging. |
-| Unified Quality Preset Architecture | 95% | 🟢 Production | Viewport `[View] -> Quality Preset...` toolbar selector, `ProjectSettings`, and runtime `RenderingServer.graphics_preset_apply(preset)` API with Low/Medium/High/Ultra tier orchestration. |
+| Unified Quality Preset & Viewport Visual Detail Architecture | 100% | 🟢 Production | Viewport `[View] -> Quality Preset...` (Low/Medium/High/Ultra/Cinematic), Resolution Scaling (up to 200% SSAA), Anti-Aliasing (TAA/MSAA 8X), Mesh Lossless LOD (0.0px), 16K Shadow Atlas, Anisotropy 16X, and runtime `RenderingServer.graphics_preset_apply(preset)`. |
 | Shader/asset hot-reload | 95% | 🟢 Production | Instant hot-reloading of shaders, textures, scripts, and packed scenes. |
 | GPU profiling integration | 75% | 🟢 Production | RenderDoc plugin integration, debug markers, and built-in Performance monitors. |
 | Asset import pipeline | 90% | 🟢 Production | GLTF 2.0, FBX (ufbx), VRAM texture compression (BCn/Basis), and ZeGFX AssetCooker. |

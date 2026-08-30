@@ -200,6 +200,38 @@ private:
 		MENU_VIEW_GRID,
 		MENU_VIEW_GIZMOS_3D_ICONS,
 		MENU_VIEW_CAMERA_SETTINGS,
+		MENU_QUALITY_LOW,
+		MENU_QUALITY_MEDIUM,
+		MENU_QUALITY_HIGH,
+		MENU_QUALITY_ULTRA,
+		MENU_QUALITY_CINEMATIC,
+		MENU_RES_SCALE_50,
+		MENU_RES_SCALE_75,
+		MENU_RES_SCALE_100,
+		MENU_RES_SCALE_125,
+		MENU_RES_SCALE_150,
+		MENU_RES_SCALE_200,
+		MENU_AA_DISABLED,
+		MENU_AA_FXAA,
+		MENU_AA_TAA,
+		MENU_AA_MSAA_2X,
+		MENU_AA_MSAA_4X,
+		MENU_AA_MSAA_8X,
+		MENU_LOD_FULL_DETAIL,
+		MENU_LOD_HIGH,
+		MENU_LOD_NORMAL,
+		MENU_LOD_PERFORMANCE,
+		MENU_SHADOW_ATLAS_2048,
+		MENU_SHADOW_ATLAS_4096,
+		MENU_SHADOW_ATLAS_8192,
+		MENU_SHADOW_ATLAS_16384,
+		MENU_SHADOW_32BIT,
+		MENU_ANISO_DISABLED,
+		MENU_ANISO_2X,
+		MENU_ANISO_4X,
+		MENU_ANISO_8X,
+		MENU_ANISO_16X,
+		MENU_DEBANDING,
 		MENU_LOCK_SELECTED,
 		MENU_UNLOCK_SELECTED,
 		MENU_GROUP_SELECTED,
@@ -218,6 +250,14 @@ private:
 	MenuButton *transform_menu = nullptr;
 	PopupMenu *gizmos_menu = nullptr;
 	MenuButton *view_layout_menu = nullptr;
+	PopupMenu *quality_submenu = nullptr;
+	PopupMenu *resolution_scale_submenu = nullptr;
+	PopupMenu *anti_aliasing_submenu = nullptr;
+	PopupMenu *mesh_lod_submenu = nullptr;
+	PopupMenu *shadow_atlas_submenu = nullptr;
+	PopupMenu *anisotropic_submenu = nullptr;
+
+	void _update_quality_menu_ui();
 
 	AcceptDialog *accept = nullptr;
 

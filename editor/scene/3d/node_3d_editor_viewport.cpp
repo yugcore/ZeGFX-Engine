@@ -610,10 +610,238 @@ void Node3DEditorViewport::cancel_transform() {
 	set_message(TTRC("Transform Aborted."), 3);
 }
 
+void Node3DEditorViewport::_apply_viewport_quality(RSE::GraphicsPreset p_preset) {
+	if (!viewport) {
+		return;
+	}
+	switch (p_preset) {
+		case RSE::GRAPHICS_PRESET_LOW: {
+			viewport->set_msaa_3d(Viewport::MSAA_DISABLED);
+			viewport->set_use_taa(false);
+			viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+			viewport->set_use_debanding(false);
+			viewport->set_positional_shadow_atlas_size(1024);
+			viewport->set_positional_shadow_atlas_16_bits(true);
+			viewport->set_mesh_lod_threshold(2.0f);
+			viewport->set_anisotropic_filtering_level(Viewport::ANISOTROPY_2X);
+			viewport->set_texture_mipmap_bias(0.0f);
+		} break;
+		case RSE::GRAPHICS_PRESET_MEDIUM: {
+			viewport->set_msaa_3d(Viewport::MSAA_DISABLED);
+			viewport->set_use_taa(false);
+			viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_FXAA);
+			viewport->set_use_debanding(true);
+			viewport->set_positional_shadow_atlas_size(2048);
+			viewport->set_positional_shadow_atlas_16_bits(true);
+			viewport->set_mesh_lod_threshold(1.0f);
+			viewport->set_anisotropic_filtering_level(Viewport::ANISOTROPY_4X);
+			viewport->set_texture_mipmap_bias(0.0f);
+		} break;
+		case RSE::GRAPHICS_PRESET_HIGH: {
+			viewport->set_msaa_3d(Viewport::MSAA_4X);
+			viewport->set_use_taa(true);
+			viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+			viewport->set_use_debanding(true);
+			viewport->set_positional_shadow_atlas_size(4096);
+			viewport->set_positional_shadow_atlas_16_bits(false);
+			viewport->set_mesh_lod_threshold(0.5f);
+			viewport->set_anisotropic_filtering_level(Viewport::ANISOTROPY_8X);
+			viewport->set_texture_mipmap_bias(-0.25f);
+		} break;
+		case RSE::GRAPHICS_PRESET_ULTRA: {
+			viewport->set_msaa_3d(Viewport::MSAA_8X);
+			viewport->set_use_taa(true);
+			viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+			viewport->set_use_debanding(true);
+			viewport->set_positional_shadow_atlas_size(8192);
+			viewport->set_positional_shadow_atlas_16_bits(false);
+			viewport->set_mesh_lod_threshold(0.0f); // Lossless geometric fidelity
+			viewport->set_anisotropic_filtering_level(Viewport::ANISOTROPY_16X);
+			viewport->set_texture_mipmap_bias(-0.5f);
+		} break;
+		case RSE::GRAPHICS_PRESET_CINEMATIC: {
+			viewport->set_msaa_3d(Viewport::MSAA_8X);
+			viewport->set_use_taa(true);
+			viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+			viewport->set_use_debanding(true);
+			viewport->set_positional_shadow_atlas_size(16384);
+			viewport->set_positional_shadow_atlas_16_bits(false);
+			viewport->set_mesh_lod_threshold(0.0f); // Lossless geometric fidelity at all distances
+			viewport->set_anisotropic_filtering_level(Viewport::ANISOTROPY_16X);
+			viewport->set_texture_mipmap_bias(-0.5f);
+		} break;
+		default:
+			break;
+	}
+	_update_viewport_quality_ui();
+}
+
+void Node3DEditorViewport::_update_viewport_quality_ui() {
+	if (!viewport) {
+		return;
+	}
+
+	if (quality_submenu) {
+		RSE::GraphicsPreset preset = RenderingServer::get_singleton()->graphics_preset_get();
+		int idx_low = quality_submenu->get_item_index(VIEW_QUALITY_LOW);
+		if (idx_low != -1) {
+			quality_submenu->set_item_checked(idx_low, preset == RSE::GRAPHICS_PRESET_LOW);
+		}
+		int idx_med = quality_submenu->get_item_index(VIEW_QUALITY_MEDIUM);
+		if (idx_med != -1) {
+			quality_submenu->set_item_checked(idx_med, preset == RSE::GRAPHICS_PRESET_MEDIUM);
+		}
+		int idx_high = quality_submenu->get_item_index(VIEW_QUALITY_HIGH);
+		if (idx_high != -1) {
+			quality_submenu->set_item_checked(idx_high, preset == RSE::GRAPHICS_PRESET_HIGH);
+		}
+		int idx_ultra = quality_submenu->get_item_index(VIEW_QUALITY_ULTRA);
+		if (idx_ultra != -1) {
+			quality_submenu->set_item_checked(idx_ultra, preset == RSE::GRAPHICS_PRESET_ULTRA);
+		}
+		int idx_cin = quality_submenu->get_item_index(VIEW_QUALITY_CINEMATIC);
+		if (idx_cin != -1) {
+			quality_submenu->set_item_checked(idx_cin, preset == RSE::GRAPHICS_PRESET_CINEMATIC);
+		}
+	}
+
+	if (resolution_scale_submenu) {
+		float scale = viewport->get_scaling_3d_scale();
+		int idx_50 = resolution_scale_submenu->get_item_index(VIEW_RES_SCALE_50);
+		if (idx_50 != -1) {
+			resolution_scale_submenu->set_item_checked(idx_50, Math::is_equal_approx(scale, 0.5f));
+		}
+		int idx_75 = resolution_scale_submenu->get_item_index(VIEW_RES_SCALE_75);
+		if (idx_75 != -1) {
+			resolution_scale_submenu->set_item_checked(idx_75, Math::is_equal_approx(scale, 0.75f));
+		}
+		int idx_100 = resolution_scale_submenu->get_item_index(VIEW_RES_SCALE_100);
+		if (idx_100 != -1) {
+			resolution_scale_submenu->set_item_checked(idx_100, Math::is_equal_approx(scale, 1.0f));
+		}
+		int idx_125 = resolution_scale_submenu->get_item_index(VIEW_RES_SCALE_125);
+		if (idx_125 != -1) {
+			resolution_scale_submenu->set_item_checked(idx_125, Math::is_equal_approx(scale, 1.25f));
+		}
+		int idx_150 = resolution_scale_submenu->get_item_index(VIEW_RES_SCALE_150);
+		if (idx_150 != -1) {
+			resolution_scale_submenu->set_item_checked(idx_150, Math::is_equal_approx(scale, 1.5f));
+		}
+		int idx_200 = resolution_scale_submenu->get_item_index(VIEW_RES_SCALE_200);
+		if (idx_200 != -1) {
+			resolution_scale_submenu->set_item_checked(idx_200, Math::is_equal_approx(scale, 2.0f));
+		}
+	}
+
+	if (anti_aliasing_submenu) {
+		bool taa = viewport->is_using_taa();
+		Viewport::ScreenSpaceAA ssaa = viewport->get_screen_space_aa();
+		Viewport::MSAA msaa = viewport->get_msaa_3d();
+
+		int idx_dis = anti_aliasing_submenu->get_item_index(VIEW_AA_DISABLED);
+		if (idx_dis != -1) {
+			anti_aliasing_submenu->set_item_checked(idx_dis, !taa && ssaa == Viewport::SCREEN_SPACE_AA_DISABLED && msaa == Viewport::MSAA_DISABLED);
+		}
+		int idx_fxaa = anti_aliasing_submenu->get_item_index(VIEW_AA_FXAA);
+		if (idx_fxaa != -1) {
+			anti_aliasing_submenu->set_item_checked(idx_fxaa, ssaa == Viewport::SCREEN_SPACE_AA_FXAA);
+		}
+		int idx_taa = anti_aliasing_submenu->get_item_index(VIEW_AA_TAA);
+		if (idx_taa != -1) {
+			anti_aliasing_submenu->set_item_checked(idx_taa, taa);
+		}
+		int idx_2x = anti_aliasing_submenu->get_item_index(VIEW_AA_MSAA_2X);
+		if (idx_2x != -1) {
+			anti_aliasing_submenu->set_item_checked(idx_2x, msaa == Viewport::MSAA_2X);
+		}
+		int idx_4x = anti_aliasing_submenu->get_item_index(VIEW_AA_MSAA_4X);
+		if (idx_4x != -1) {
+			anti_aliasing_submenu->set_item_checked(idx_4x, msaa == Viewport::MSAA_4X);
+		}
+		int idx_8x = anti_aliasing_submenu->get_item_index(VIEW_AA_MSAA_8X);
+		if (idx_8x != -1) {
+			anti_aliasing_submenu->set_item_checked(idx_8x, msaa == Viewport::MSAA_8X);
+		}
+	}
+
+	if (mesh_lod_submenu) {
+		float lod = viewport->get_mesh_lod_threshold();
+		int idx_full = mesh_lod_submenu->get_item_index(VIEW_LOD_FULL_DETAIL);
+		if (idx_full != -1) {
+			mesh_lod_submenu->set_item_checked(idx_full, Math::is_zero_approx(lod));
+		}
+		int idx_high = mesh_lod_submenu->get_item_index(VIEW_LOD_HIGH);
+		if (idx_high != -1) {
+			mesh_lod_submenu->set_item_checked(idx_high, Math::is_equal_approx(lod, 0.5f));
+		}
+		int idx_norm = mesh_lod_submenu->get_item_index(VIEW_LOD_NORMAL);
+		if (idx_norm != -1) {
+			mesh_lod_submenu->set_item_checked(idx_norm, Math::is_equal_approx(lod, 1.0f));
+		}
+		int idx_perf = mesh_lod_submenu->get_item_index(VIEW_LOD_PERFORMANCE);
+		if (idx_perf != -1) {
+			mesh_lod_submenu->set_item_checked(idx_perf, Math::is_equal_approx(lod, 2.0f));
+		}
+	}
+
+	if (shadow_atlas_submenu) {
+		int shadow_size = viewport->get_positional_shadow_atlas_size();
+		int idx_2048 = shadow_atlas_submenu->get_item_index(VIEW_SHADOW_ATLAS_2048);
+		if (idx_2048 != -1) {
+			shadow_atlas_submenu->set_item_checked(idx_2048, shadow_size == 2048);
+		}
+		int idx_4096 = shadow_atlas_submenu->get_item_index(VIEW_SHADOW_ATLAS_4096);
+		if (idx_4096 != -1) {
+			shadow_atlas_submenu->set_item_checked(idx_4096, shadow_size == 4096);
+		}
+		int idx_8192 = shadow_atlas_submenu->get_item_index(VIEW_SHADOW_ATLAS_8192);
+		if (idx_8192 != -1) {
+			shadow_atlas_submenu->set_item_checked(idx_8192, shadow_size == 8192);
+		}
+		int idx_16384 = shadow_atlas_submenu->get_item_index(VIEW_SHADOW_ATLAS_16384);
+		if (idx_16384 != -1) {
+			shadow_atlas_submenu->set_item_checked(idx_16384, shadow_size == 16384);
+		}
+		int idx_32bit = shadow_atlas_submenu->get_item_index(VIEW_SHADOW_32BIT);
+		if (idx_32bit != -1) {
+			shadow_atlas_submenu->set_item_checked(idx_32bit, !viewport->get_positional_shadow_atlas_16_bits());
+		}
+	}
+
+	if (anisotropic_submenu) {
+		Viewport::AnisotropicFiltering aniso = viewport->get_anisotropic_filtering_level();
+		int idx_dis = anisotropic_submenu->get_item_index(VIEW_ANISO_DISABLED);
+		if (idx_dis != -1) {
+			anisotropic_submenu->set_item_checked(idx_dis, aniso == Viewport::ANISOTROPY_DISABLED);
+		}
+		int idx_2x = anisotropic_submenu->get_item_index(VIEW_ANISO_2X);
+		if (idx_2x != -1) {
+			anisotropic_submenu->set_item_checked(idx_2x, aniso == Viewport::ANISOTROPY_2X);
+		}
+		int idx_4x = anisotropic_submenu->get_item_index(VIEW_ANISO_4X);
+		if (idx_4x != -1) {
+			anisotropic_submenu->set_item_checked(idx_4x, aniso == Viewport::ANISOTROPY_4X);
+		}
+		int idx_8x = anisotropic_submenu->get_item_index(VIEW_ANISO_8X);
+		if (idx_8x != -1) {
+			anisotropic_submenu->set_item_checked(idx_8x, aniso == Viewport::ANISOTROPY_8X);
+		}
+		int idx_16x = anisotropic_submenu->get_item_index(VIEW_ANISO_16X);
+		if (idx_16x != -1) {
+			anisotropic_submenu->set_item_checked(idx_16x, aniso == Viewport::ANISOTROPY_16X);
+		}
+	}
+
+	if (view_display_menu && view_display_menu->get_popup()->get_item_index(VIEW_DEBANDING) != -1) {
+		view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_DEBANDING), viewport->is_using_debanding());
+	}
+}
+
 void Node3DEditorViewport::_update_shrink() {
 	const float scaling_3d_scale = GLOBAL_GET("rendering/scaling_3d/scale");
 	const float shrink_factor = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_HALF_RESOLUTION)) ? 0.5 : 1.0;
 	viewport->set_scaling_3d_scale(MAX(0.25, scaling_3d_scale * shrink_factor));
+	_update_viewport_quality_ui();
 }
 
 float Node3DEditorViewport::get_znear() const {
@@ -4567,25 +4795,174 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 		case VIEW_QUALITY_LOW:
 		case VIEW_QUALITY_MEDIUM:
 		case VIEW_QUALITY_HIGH:
-		case VIEW_QUALITY_ULTRA: {
-			if (quality_submenu) {
-				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_LOW), p_option == VIEW_QUALITY_LOW);
-				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_MEDIUM), p_option == VIEW_QUALITY_MEDIUM);
-				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_HIGH), p_option == VIEW_QUALITY_HIGH);
-				quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_ULTRA), p_option == VIEW_QUALITY_ULTRA);
-			}
+		case VIEW_QUALITY_ULTRA:
+		case VIEW_QUALITY_CINEMATIC: {
 			RSE::GraphicsPreset preset = RSE::GRAPHICS_PRESET_HIGH;
+			String preset_name = "High";
 			if (p_option == VIEW_QUALITY_LOW) {
 				preset = RSE::GRAPHICS_PRESET_LOW;
+				preset_name = "Low";
 			} else if (p_option == VIEW_QUALITY_MEDIUM) {
 				preset = RSE::GRAPHICS_PRESET_MEDIUM;
+				preset_name = "Medium";
 			} else if (p_option == VIEW_QUALITY_HIGH) {
 				preset = RSE::GRAPHICS_PRESET_HIGH;
+				preset_name = "High";
 			} else if (p_option == VIEW_QUALITY_ULTRA) {
 				preset = RSE::GRAPHICS_PRESET_ULTRA;
+				preset_name = "Ultra";
+			} else if (p_option == VIEW_QUALITY_CINEMATIC) {
+				preset = RSE::GRAPHICS_PRESET_CINEMATIC;
+				preset_name = "Cinematic (Maximum Fidelity)";
 			}
 			RenderingServer::get_singleton()->graphics_preset_apply(preset);
-			set_message(vformat(TTR("Graphics Quality Preset: %s"), (p_option == VIEW_QUALITY_LOW) ? "Low" : (p_option == VIEW_QUALITY_MEDIUM) ? "Medium" : (p_option == VIEW_QUALITY_HIGH) ? "High" : "Ultra"), 3);
+			_apply_viewport_quality(preset);
+			set_message(vformat(TTR("Graphics Quality Preset: %s"), preset_name), 3);
+		} break;
+		case VIEW_RES_SCALE_50:
+		case VIEW_RES_SCALE_75:
+		case VIEW_RES_SCALE_100:
+		case VIEW_RES_SCALE_125:
+		case VIEW_RES_SCALE_150:
+		case VIEW_RES_SCALE_200: {
+			float scale = 1.0f;
+			if (p_option == VIEW_RES_SCALE_50) {
+				scale = 0.5f;
+			} else if (p_option == VIEW_RES_SCALE_75) {
+				scale = 0.75f;
+			} else if (p_option == VIEW_RES_SCALE_100) {
+				scale = 1.0f;
+			} else if (p_option == VIEW_RES_SCALE_125) {
+				scale = 1.25f;
+			} else if (p_option == VIEW_RES_SCALE_150) {
+				scale = 1.5f;
+			} else if (p_option == VIEW_RES_SCALE_200) {
+				scale = 2.0f;
+			}
+			viewport->set_scaling_3d_scale(scale);
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Resolution Scale: %d%%"), int(scale * 100)), 3);
+		} break;
+		case VIEW_AA_DISABLED:
+		case VIEW_AA_FXAA:
+		case VIEW_AA_TAA:
+		case VIEW_AA_MSAA_2X:
+		case VIEW_AA_MSAA_4X:
+		case VIEW_AA_MSAA_8X: {
+			String aa_name = "Disabled";
+			if (p_option == VIEW_AA_DISABLED) {
+				viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+				viewport->set_use_taa(false);
+				viewport->set_msaa_3d(Viewport::MSAA_DISABLED);
+				aa_name = "Disabled";
+			} else if (p_option == VIEW_AA_FXAA) {
+				viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_FXAA);
+				viewport->set_use_taa(false);
+				viewport->set_msaa_3d(Viewport::MSAA_DISABLED);
+				aa_name = "FXAA";
+			} else if (p_option == VIEW_AA_TAA) {
+				viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+				viewport->set_use_taa(true);
+				viewport->set_msaa_3d(Viewport::MSAA_DISABLED);
+				aa_name = "TAA (Subpixel Halton Jitter)";
+			} else if (p_option == VIEW_AA_MSAA_2X) {
+				viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+				viewport->set_use_taa(false);
+				viewport->set_msaa_3d(Viewport::MSAA_2X);
+				aa_name = "MSAA 2X";
+			} else if (p_option == VIEW_AA_MSAA_4X) {
+				viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+				viewport->set_use_taa(false);
+				viewport->set_msaa_3d(Viewport::MSAA_4X);
+				aa_name = "MSAA 4X";
+			} else if (p_option == VIEW_AA_MSAA_8X) {
+				viewport->set_screen_space_aa(Viewport::SCREEN_SPACE_AA_DISABLED);
+				viewport->set_use_taa(false);
+				viewport->set_msaa_3d(Viewport::MSAA_8X);
+				aa_name = "MSAA 8X";
+			}
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Anti-Aliasing: %s"), aa_name), 3);
+		} break;
+		case VIEW_LOD_FULL_DETAIL:
+		case VIEW_LOD_HIGH:
+		case VIEW_LOD_NORMAL:
+		case VIEW_LOD_PERFORMANCE: {
+			float lod = 1.0f;
+			String lod_name = "Normal (1.0px)";
+			if (p_option == VIEW_LOD_FULL_DETAIL) {
+				lod = 0.0f;
+				lod_name = "Full Geometric Detail (LOD 0 Lossless - 0.0px)";
+			} else if (p_option == VIEW_LOD_HIGH) {
+				lod = 0.5f;
+				lod_name = "High Detail (0.5px)";
+			} else if (p_option == VIEW_LOD_NORMAL) {
+				lod = 1.0f;
+				lod_name = "Normal (1.0px)";
+			} else if (p_option == VIEW_LOD_PERFORMANCE) {
+				lod = 2.0f;
+				lod_name = "Performance (2.0px)";
+			}
+			viewport->set_mesh_lod_threshold(lod);
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Mesh LOD Detail: %s"), lod_name), 3);
+		} break;
+		case VIEW_SHADOW_ATLAS_2048:
+		case VIEW_SHADOW_ATLAS_4096:
+		case VIEW_SHADOW_ATLAS_8192:
+		case VIEW_SHADOW_ATLAS_16384: {
+			int atlas_size = 4096;
+			if (p_option == VIEW_SHADOW_ATLAS_2048) {
+				atlas_size = 2048;
+			} else if (p_option == VIEW_SHADOW_ATLAS_4096) {
+				atlas_size = 4096;
+			} else if (p_option == VIEW_SHADOW_ATLAS_8192) {
+				atlas_size = 8192;
+			} else if (p_option == VIEW_SHADOW_ATLAS_16384) {
+				atlas_size = 16384;
+			}
+			viewport->set_positional_shadow_atlas_size(atlas_size);
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Shadow Atlas Size: %d"), atlas_size), 3);
+		} break;
+		case VIEW_SHADOW_32BIT: {
+			bool is_16 = viewport->get_positional_shadow_atlas_16_bits();
+			viewport->set_positional_shadow_atlas_16_bits(!is_16);
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Shadow 32-Bit Float Depth: %s"), (!is_16) ? "Enabled" : "Disabled"), 3);
+		} break;
+		case VIEW_ANISO_DISABLED:
+		case VIEW_ANISO_2X:
+		case VIEW_ANISO_4X:
+		case VIEW_ANISO_8X:
+		case VIEW_ANISO_16X: {
+			Viewport::AnisotropicFiltering aniso = Viewport::ANISOTROPY_4X;
+			String aniso_name = "4X";
+			if (p_option == VIEW_ANISO_DISABLED) {
+				aniso = Viewport::ANISOTROPY_DISABLED;
+				aniso_name = "Disabled";
+			} else if (p_option == VIEW_ANISO_2X) {
+				aniso = Viewport::ANISOTROPY_2X;
+				aniso_name = "2X";
+			} else if (p_option == VIEW_ANISO_4X) {
+				aniso = Viewport::ANISOTROPY_4X;
+				aniso_name = "4X";
+			} else if (p_option == VIEW_ANISO_8X) {
+				aniso = Viewport::ANISOTROPY_8X;
+				aniso_name = "8X";
+			} else if (p_option == VIEW_ANISO_16X) {
+				aniso = Viewport::ANISOTROPY_16X;
+				aniso_name = "16X (Maximum Texture Clarity)";
+			}
+			viewport->set_anisotropic_filtering_level(aniso);
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Anisotropic Filtering: %s"), aniso_name), 3);
+		} break;
+		case VIEW_DEBANDING: {
+			bool deband = !viewport->is_using_debanding();
+			viewport->set_use_debanding(deband);
+			_update_viewport_quality_ui();
+			set_message(vformat(TTR("Debanding (10-bit Screen Dithering): %s"), deband ? "Enabled" : "Disabled"), 3);
 		} break;
 		case VIEW_GIZMOS: {
 			int idx = view_display_menu->get_popup()->get_item_index(VIEW_GIZMOS);
@@ -6926,9 +7303,64 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	quality_submenu->add_radio_check_item(TTRC("Medium"), VIEW_QUALITY_MEDIUM);
 	quality_submenu->add_radio_check_item(TTRC("High"), VIEW_QUALITY_HIGH);
 	quality_submenu->add_radio_check_item(TTRC("Ultra"), VIEW_QUALITY_ULTRA);
+	quality_submenu->add_radio_check_item(TTRC("Cinematic (Maximum Fidelity)"), VIEW_QUALITY_CINEMATIC);
 	quality_submenu->set_item_checked(quality_submenu->get_item_index(VIEW_QUALITY_HIGH), true);
 	quality_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
 	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Quality Preset..."), quality_submenu);
+
+	resolution_scale_submenu = memnew(PopupMenu);
+	resolution_scale_submenu->set_hide_on_checkable_item_selection(false);
+	resolution_scale_submenu->add_radio_check_item(TTRC("50% (Half Resolution)"), VIEW_RES_SCALE_50);
+	resolution_scale_submenu->add_radio_check_item(TTRC("75% (Performance)"), VIEW_RES_SCALE_75);
+	resolution_scale_submenu->add_radio_check_item(TTRC("100% (Native 1:1)"), VIEW_RES_SCALE_100);
+	resolution_scale_submenu->add_radio_check_item(TTRC("125% (High Fidelity)"), VIEW_RES_SCALE_125);
+	resolution_scale_submenu->add_radio_check_item(TTRC("150% (Ultra Supersampling)"), VIEW_RES_SCALE_150);
+	resolution_scale_submenu->add_radio_check_item(TTRC("200% (Cinematic Extreme SSAA)"), VIEW_RES_SCALE_200);
+	resolution_scale_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
+	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Resolution Scale..."), resolution_scale_submenu);
+
+	anti_aliasing_submenu = memnew(PopupMenu);
+	anti_aliasing_submenu->set_hide_on_checkable_item_selection(false);
+	anti_aliasing_submenu->add_radio_check_item(TTRC("Disabled"), VIEW_AA_DISABLED);
+	anti_aliasing_submenu->add_radio_check_item(TTRC("FXAA (Fast Screen-Space)"), VIEW_AA_FXAA);
+	anti_aliasing_submenu->add_radio_check_item(TTRC("TAA (Subpixel Halton Jitter)"), VIEW_AA_TAA);
+	anti_aliasing_submenu->add_radio_check_item(TTRC("MSAA 2X"), VIEW_AA_MSAA_2X);
+	anti_aliasing_submenu->add_radio_check_item(TTRC("MSAA 4X"), VIEW_AA_MSAA_4X);
+	anti_aliasing_submenu->add_radio_check_item(TTRC("MSAA 8X"), VIEW_AA_MSAA_8X);
+	anti_aliasing_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
+	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Anti-Aliasing..."), anti_aliasing_submenu);
+
+	mesh_lod_submenu = memnew(PopupMenu);
+	mesh_lod_submenu->set_hide_on_checkable_item_selection(false);
+	mesh_lod_submenu->add_radio_check_item(TTRC("Full Geometric Detail (LOD 0 Lossless - 0.0px)"), VIEW_LOD_FULL_DETAIL);
+	mesh_lod_submenu->add_radio_check_item(TTRC("High Detail (0.5px)"), VIEW_LOD_HIGH);
+	mesh_lod_submenu->add_radio_check_item(TTRC("Normal Detail (1.0px)"), VIEW_LOD_NORMAL);
+	mesh_lod_submenu->add_radio_check_item(TTRC("Performance Detail (2.0px)"), VIEW_LOD_PERFORMANCE);
+	mesh_lod_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
+	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Mesh Detail (LOD)..."), mesh_lod_submenu);
+
+	shadow_atlas_submenu = memnew(PopupMenu);
+	shadow_atlas_submenu->set_hide_on_checkable_item_selection(false);
+	shadow_atlas_submenu->add_radio_check_item(TTRC("2048 (Default)"), VIEW_SHADOW_ATLAS_2048);
+	shadow_atlas_submenu->add_radio_check_item(TTRC("4096 (High)"), VIEW_SHADOW_ATLAS_4096);
+	shadow_atlas_submenu->add_radio_check_item(TTRC("8192 (Ultra)"), VIEW_SHADOW_ATLAS_8192);
+	shadow_atlas_submenu->add_radio_check_item(TTRC("16384 (Cinematic Extreme)"), VIEW_SHADOW_ATLAS_16384);
+	shadow_atlas_submenu->add_separator();
+	shadow_atlas_submenu->add_check_item(TTRC("32-Bit Float Depth Precision"), VIEW_SHADOW_32BIT);
+	shadow_atlas_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
+	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Shadow Atlas..."), shadow_atlas_submenu);
+
+	anisotropic_submenu = memnew(PopupMenu);
+	anisotropic_submenu->set_hide_on_checkable_item_selection(false);
+	anisotropic_submenu->add_radio_check_item(TTRC("Disabled"), VIEW_ANISO_DISABLED);
+	anisotropic_submenu->add_radio_check_item(TTRC("2X"), VIEW_ANISO_2X);
+	anisotropic_submenu->add_radio_check_item(TTRC("4X"), VIEW_ANISO_4X);
+	anisotropic_submenu->add_radio_check_item(TTRC("8X"), VIEW_ANISO_8X);
+	anisotropic_submenu->add_radio_check_item(TTRC("16X (Maximum Texture Clarity)"), VIEW_ANISO_16X);
+	anisotropic_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
+	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Anisotropic Filtering..."), anisotropic_submenu);
+
+	view_display_menu->get_popup()->add_check_item(TTRC("Debanding (10-bit Screen Dithering)"), VIEW_DEBANDING);
 
 	view_display_menu->get_popup()->add_separator();
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_environment", TTRC("View Environment")), VIEW_ENVIRONMENT);
@@ -6959,6 +7391,8 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	view_display_menu->get_popup()->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
 	display_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
 	view_display_menu->set_disable_shortcuts(true);
+
+	_apply_viewport_quality(RSE::GRAPHICS_PRESET_HIGH);
 
 	_load_viewport_inputs();
 	InputMap::get_singleton()->connect("project_settings_loaded", callable_mp(this, &Node3DEditorViewport::_load_viewport_inputs));

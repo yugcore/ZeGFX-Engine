@@ -72,6 +72,7 @@ const char *EditorBuildProfile::build_option_identifiers[BUILD_OPTION_MAX] = {
 	"disable_physics_2d",
 	"module_godot_physics_2d_enabled",
 	"disable_physics_3d",
+	"module_godot_physics_3d_enabled",
 	"module_jolt_physics_enabled",
 	"module_text_server_fb_enabled",
 	"module_text_server_adv_enabled",

@@ -4133,6 +4133,14 @@ void RenderForwardClustered::graphics_preset_apply(RSE::GraphicsPreset p_preset)
 			environment_set_sdfgi_ray_count(RSE::ENV_SDFGI_RAY_COUNT_128);
 			environment_set_sdfgi_frames_to_converge(RSE::ENV_SDFGI_CONVERGE_IN_30_FRAMES);
 		} break;
+		case RSE::GRAPHICS_PRESET_CINEMATIC: {
+			ss_effects->ssao_set_quality(RSE::ENV_SSAO_QUALITY_ULTRA, false, 0.35f, 4, 50.0f, 500.0f);
+			ss_effects->ssil_set_quality(RSE::ENV_SSIL_QUALITY_ULTRA, false, 0.35f, 4, 50.0f, 500.0f);
+			ss_effects->ssr_set_half_size(false);
+			gi.voxel_gi_quality = RSE::VOXEL_GI_QUALITY_HIGH;
+			environment_set_sdfgi_ray_count(RSE::ENV_SDFGI_RAY_COUNT_128);
+			environment_set_sdfgi_frames_to_converge(RSE::ENV_SDFGI_CONVERGE_IN_30_FRAMES);
+		} break;
 		default:
 			break;
 	}

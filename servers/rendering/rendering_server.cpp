@@ -2612,6 +2612,7 @@ void RenderingServer::_bind_methods() {
 	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_MEDIUM);
 	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_HIGH);
 	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_ULTRA);
+	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_CINEMATIC);
 	BIND_ENUM_CONSTANT(RSE::GRAPHICS_PRESET_MAX);
 
 	BIND_ENUM_CONSTANT(RSE::SHADOW_QUALITY_HARD);
@@ -3686,7 +3687,7 @@ void RenderingServer::init() {
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/limits/time/time_rollover_secs", PROPERTY_HINT_RANGE, "1,10000,1,or_greater,suffix:s"), 3600);
 
 	GLOBAL_DEF_RST("rendering/lights_and_shadows/use_physical_light_units", false);
-	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/quality/preset", PROPERTY_HINT_ENUM, "Low,Medium,High,Ultra"), 2);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/quality/preset", PROPERTY_HINT_ENUM, "Low,Medium,High,Ultra,Cinematic"), 2);
 
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/lights_and_shadows/directional_shadow/size", PROPERTY_HINT_RANGE, "256,16384"), 4096);
 	GLOBAL_DEF("rendering/lights_and_shadows/directional_shadow/size.mobile", 2048);
