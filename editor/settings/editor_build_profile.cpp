@@ -72,7 +72,6 @@ const char *EditorBuildProfile::build_option_identifiers[BUILD_OPTION_MAX] = {
 	"disable_physics_2d",
 	"module_godot_physics_2d_enabled",
 	"disable_physics_3d",
-	"module_godot_physics_3d_enabled",
 	"module_jolt_physics_enabled",
 	"module_text_server_fb_enabled",
 	"module_text_server_adv_enabled",
@@ -242,9 +241,6 @@ const HashMap<EditorBuildProfile::BuildOption, LocalVector<EditorBuildProfile::B
 	} },
 	{ BUILD_OPTION_PHYSICS_GODOT_2D, {
 			BUILD_OPTION_PHYSICS_2D,
-	} },
-	{ BUILD_OPTION_PHYSICS_GODOT_3D, {
-			BUILD_OPTION_PHYSICS_3D,
 	} },
 	{ BUILD_OPTION_PHYSICS_JOLT, {
 			BUILD_OPTION_PHYSICS_3D,
@@ -637,7 +633,6 @@ void EditorBuildProfile::_bind_methods() {
 	BIND_ENUM_CONSTANT(BUILD_OPTION_PHYSICS_2D);
 	BIND_ENUM_CONSTANT(BUILD_OPTION_PHYSICS_GODOT_2D);
 	BIND_ENUM_CONSTANT(BUILD_OPTION_PHYSICS_3D);
-	BIND_ENUM_CONSTANT(BUILD_OPTION_PHYSICS_GODOT_3D);
 	BIND_ENUM_CONSTANT(BUILD_OPTION_PHYSICS_JOLT);
 	BIND_ENUM_CONSTANT(BUILD_OPTION_TEXT_SERVER_FALLBACK);
 	BIND_ENUM_CONSTANT(BUILD_OPTION_TEXT_SERVER_ADVANCED);
@@ -716,13 +711,8 @@ EditorBuildProfile::EditorBuildProfile() {
 	};
 	build_option_settings.insert(BUILD_OPTION_OPENGL, settings_opengl);
 
-	HashMap<String, LocalVector<Variant>> settings_phy_godot_3d = {
-		{ "physics/3d/physics_engine", { "DEFAULT", "GodotPhysics3D" } },
-	};
-	build_option_settings.insert(BUILD_OPTION_PHYSICS_GODOT_3D, settings_phy_godot_3d);
-
 	HashMap<String, LocalVector<Variant>> settings_jolt = {
-		{ "physics/3d/physics_engine", { "Jolt Physics" } },
+		{ "physics/3d/physics_engine", { "DEFAULT", "Jolt Physics" } },
 	};
 	build_option_settings.insert(BUILD_OPTION_PHYSICS_JOLT, settings_jolt);
 
