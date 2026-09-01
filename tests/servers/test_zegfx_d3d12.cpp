@@ -14,6 +14,7 @@ TEST_FORCE_LINK(test_zegfx_d3d12)
 #include "drivers/d3d12/dxr_pipeline.h"
 #include "ZeGFX/include/render_graph.h"
 #include "ZeGFX/include/graphics_backend.h"
+#include "ZeGFX/include/cooked_asset_serialization.h"
 #endif
 
 namespace TestZeGFXD3D12 {
@@ -76,5 +77,69 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
     }
 #endif
 }
+
+#ifdef WITH_DX12_BACKEND
+TEST_CASE("[ZeGFX][D3D12] Cooked Asset Serialization and Octahedral Vertex Packing") {
+    SUBCASE("Packed Vertex Structure Layout and Stride Validation") {
+        CHECK(sizeof(zegfx::DX12Vertex3DTextured) == 48);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, x) == 0);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, octNormal) == 12);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, octTangent) == 16);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, u) == 20);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, u1) == 24);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, colorRgba) == 28);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, jointIndices) == 32);
+        CHECK(offsetof(zegfx::DX12Vertex3DTextured, jointWeights) == 40);
+    }
+
+    SUBCASE("Octahedral Normal Encoding & Decoding Parity") {
+        float testVectors[5][3] = {
+            { 0.0f, 1.0f, 0.0f },
+            { 1.0f, 0.0f, 0.0f },
+            { 0.0f, 0.0f, 1.0f },
+            { 0.0f, 0.0f, -1.0f },
+            { 0.57735f, 0.57735f, 0.57735f }
+        };
+
+        for (int i = 0; i < 5; ++i) {
+            int16_t oct[2] = {};
+            zegfx::encodeOctahedralSNORM16(testVectors[i][0], testVectors[i][1], testVectors[i][2], oct);
+
+            float rx = 0.0f, ry = 0.0f, rz = 0.0f;
+            zegfx::decodeOctahedralSNORM16(oct, rx, ry, rz);
+
+            CHECK(doctest::Approx(rx).epsilon(0.01f) == testVectors[i][0]);
+            CHECK(doctest::Approx(ry).epsilon(0.01f) == testVectors[i][1]);
+            CHECK(doctest::Approx(rz).epsilon(0.01f) == testVectors[i][2]);
+        }
+    }
+
+    SUBCASE("Octahedral Tangent Handedness Preservation") {
+        float tx = 1.0f, ty = 0.0f, tz = 0.0f;
+
+        int16_t octPositive[2] = {};
+        zegfx::encodeOctahedralTangentSNORM16(tx, ty, tz, 1.0f, octPositive);
+        float rx = 0.0f, ry = 0.0f, rz = 0.0f, rw = 0.0f;
+        zegfx::decodeOctahedralTangentSNORM16(octPositive, rx, ry, rz, rw);
+        CHECK(rw == 1.0f);
+        CHECK(doctest::Approx(rx).epsilon(0.01f) == 1.0f);
+
+        int16_t octNegative[2] = {};
+        zegfx::encodeOctahedralTangentSNORM16(tx, ty, tz, -1.0f, octNegative);
+        zegfx::decodeOctahedralTangentSNORM16(octNegative, rx, ry, rz, rw);
+        CHECK(rw == -1.0f);
+        CHECK(doctest::Approx(rx).epsilon(0.01f) == 1.0f);
+    }
+
+    SUBCASE("Float16 Half Precision Round Trip") {
+        float testVals[] = { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f, -0.5f, 12.34f };
+        for (float v : testVals) {
+            uint16_t h = zegfx::floatToHalf(v);
+            float r = zegfx::halfToFloat(h);
+            CHECK(doctest::Approx(r).epsilon(0.01f) == v);
+        }
+    }
+}
+#endif
 
 } // namespace TestZeGFXD3D12

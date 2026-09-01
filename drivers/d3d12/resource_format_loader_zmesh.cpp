@@ -534,22 +534,15 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 				// Read constant buffer (PBR parameters)
 				if (meta->ConstantBufferBytes >= 36 && offset + meta->ConstantBufferBytes <= file_len) {
 					const float *cb = reinterpret_cast<const float *>(data + offset);
-					// Constant buffer parameters from GLTF/FBX are ALREADY in linear space.
-					Color albedo_col = Color(cb[0], cb[1], cb[2], cb[3]);
-					if (albedo_col.r <= 0.001f && albedo_col.g <= 0.001f && albedo_col.b <= 0.001f) {
-						albedo_col = Color(1.0f, 1.0f, 1.0f, 1.0f);
-					}
+					// Base color factor is serialized in linear space — convert to sRGB for Godot's StandardMaterial3D
+					Color albedo_col = Color(cb[0], cb[1], cb[2], cb[3]).linear_to_srgb();
 					mat->set_albedo(albedo_col);
 					if (cb[4] > 0.001f || cb[5] > 0.001f || cb[6] > 0.001f) {
 						mat->set_emission(Color(cb[4], cb[5], cb[6]));
 						mat->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
 					}
 					mat->set_metallic(cb[7]);
-					float roughness_val = cb[8];
-					if (roughness_val <= 0.001f) {
-						roughness_val = 1.0f;
-					}
-					mat->set_roughness(roughness_val);
+					mat->set_roughness(cb[8]);
 
 					if (meta->BlendMode == 2) {
 						mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA);
@@ -599,12 +592,13 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 
 						if (tex.is_valid()) {
 							String p_lower = param_name.to_lower();
-							bool is_albedo = (param_name == "Albedo" || p_lower.contains("albedo") || p_lower.contains("diffuse") || p_lower.contains("basecolor") || p_lower.contains("base_color") || param_name == "#D2077977");
-							bool is_normal = (param_name == "Normal" || p_lower.contains("normal") || param_name == "#459A0837");
-							bool is_orm = (param_name == "OcclusionRoughnessMetallic" || param_name == "ORM" || param_name == "#F6A8B084");
-							bool is_rough_metal = (param_name == "RoughnessMetallic" || p_lower.contains("rough") || p_lower.contains("arm") || p_lower.contains("orm") || param_name == "#4F1BF470");
-							bool is_metal = (param_name == "Metallic" || param_name == "Metalness" || p_lower.contains("metal") || param_name == "#E1A17BA2");
-							bool is_ao = (param_name == "AmbientOcclusion" || param_name == "occlusionTexture" || p_lower.contains("occlusion") || p_lower == "ao" || param_name == "#3D7A4F23");
+							bool is_albedo = (param_name == "Albedo" || p_lower == "diffuse" || p_lower == "basecolor" || p_lower == "base_color" || p_lower.contains("albedo") || p_lower.contains("diff") || p_lower.contains("color") || param_name == "#D2077977");
+							bool is_normal = (param_name == "Normal" || p_lower.contains("normal") || p_lower.contains("nor") || param_name == "#459A0837");
+							bool is_orm = (param_name == "OcclusionRoughnessMetallic" || param_name == "ORM" || p_lower.contains("orm") || p_lower.contains("arm") || param_name == "#F6A8B084");
+							bool is_rough_metal = (param_name == "RoughnessMetallic" || p_lower == "roughnessmetallic" || p_lower == "metallicroughness" || p_lower.contains("roughnessmetallic") || p_lower.contains("metallicroughness") || param_name == "#4F1BF470");
+							bool is_metal_only = (!is_rough_metal && !is_orm && (p_lower == "metallic" || p_lower == "metalness" || p_lower == "metal" || p_lower.contains("metallic") || param_name == "#E1A17BA2"));
+							bool is_rough_only = (!is_rough_metal && !is_orm && (p_lower == "roughness" || p_lower == "rough" || p_lower.contains("roughness")));
+							bool is_ao = (param_name == "AmbientOcclusion" || param_name == "occlusionTexture" || p_lower == "ao" || p_lower == "occlusion" || param_name == "#3D7A4F23");
 							bool is_emiss = (param_name == "Emissive" || p_lower.contains("emiss") || param_name == "#E821C8A1");
 
 							if (is_albedo) {
@@ -614,9 +608,11 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 							} else if (is_orm) {
 								rough_tex = tex;
 								ao_tex = tex;
-							} else if (is_metal) {
-								metal_tex = tex;
 							} else if (is_rough_metal) {
+								rough_tex = tex;
+							} else if (is_metal_only) {
+								metal_tex = tex;
+							} else if (is_rough_only) {
 								rough_tex = tex;
 							} else if (is_ao) {
 								ao_tex = tex;
@@ -630,99 +626,81 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 		}
 	}
 
-	// 2. Fallback fuzzy token scanner if textures were not bound in header
-	String mat_base_name = p_path.get_file().get_basename().to_lower();
-	int dot_pos = mat_base_name.rfind(".");
-	if (dot_pos != -1 && dot_pos > 0) {
-		mat_base_name = mat_base_name.substr(0, dot_pos);
-	}
-	String mat_clean = mat_base_name.replace(" ", "_").replace(".", "_").to_lower();
+	// 2. Fallback fuzzy token scanner only in the material's immediate local directory if textures were not explicitly bound
+	if (albedo_tex.is_null() && normal_tex.is_null() && rough_tex.is_null()) {
+		String mat_base_name = p_path.get_file().get_basename().to_lower();
+		int dot_pos = mat_base_name.rfind(".");
+		if (dot_pos != -1 && dot_pos > 0) {
+			mat_base_name = mat_base_name.substr(0, dot_pos);
+		}
+		String mat_clean = mat_base_name.replace(" ", "_").replace(".", "_").to_lower();
 
-	Vector<String> all_candidate_images;
+		Vector<String> local_candidate_dirs;
+		local_candidate_dirs.push_back(local_dir);
+		local_candidate_dirs.push_back(local_dir.path_join("Textures"));
+		local_candidate_dirs.push_back(local_dir.path_join("textures"));
 
-	for (int d = 0; d < search_dirs.size(); ++d) {
-		Ref<DirAccess> da = DirAccess::open(search_dirs[d]);
-		if (da.is_null()) continue;
+		for (int d = 0; d < local_candidate_dirs.size(); ++d) {
+			Ref<DirAccess> da = DirAccess::open(local_candidate_dirs[d]);
+			if (da.is_null()) continue;
 
-		da->list_dir_begin();
-		String f_name = da->get_next();
-		while (!f_name.is_empty()) {
-			if (!da->current_is_dir()) {
-				String ext = f_name.get_extension().to_lower();
-				if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "exr" || ext == "webp" || ext == "dds" || ext == "tga" || ext == "ztex" || ext == "zetex") {
-					String fn_lower = f_name.to_lower();
-					String full_path = search_dirs[d].path_join(f_name);
-					all_candidate_images.push_back(full_path);
+			da->list_dir_begin();
+			String f_name = da->get_next();
+			while (!f_name.is_empty()) {
+				if (!da->current_is_dir()) {
+					String ext = f_name.get_extension().to_lower();
+					if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "exr" || ext == "webp" || ext == "dds" || ext == "tga" || ext == "ztex" || ext == "zetex") {
+						String fn_lower = f_name.to_lower();
+						String full_path = local_candidate_dirs[d].path_join(f_name);
 
-					bool matches_mat = false;
-					if (fn_lower.contains(mat_clean)) {
-						matches_mat = true;
-					} else {
-						PackedStringArray tokens = mat_clean.split("_");
-						int matched_tokens = 0;
-						for (int t = 0; t < tokens.size(); ++t) {
-							String tok = tokens[t];
-							if (tok.length() >= 3 && fn_lower.contains(tok)) {
-								matched_tokens++;
-							} else if (tok == "01" || tok == "02" || tok == "23" || tok == "001" || tok == "002" || tok == "003") {
-								String short_num = tok.lstrip("0");
-								if (fn_lower.contains(tok) || (!short_num.is_empty() && fn_lower.contains(short_num))) {
+						bool matches_mat = false;
+						if (fn_lower.contains(mat_clean)) {
+							matches_mat = true;
+						} else {
+							PackedStringArray tokens = mat_clean.split("_");
+							int matched_tokens = 0;
+							for (int t = 0; t < tokens.size(); ++t) {
+								String tok = tokens[t];
+								if (tok.length() >= 4 && fn_lower.contains(tok)) {
 									matched_tokens++;
 								}
 							}
+							if (matched_tokens >= 1) {
+								matches_mat = true;
+							}
 						}
-						if (matched_tokens >= 1) {
-							matches_mat = true;
-						}
-					}
 
-					if (matches_mat) {
-						if (albedo_tex.is_null() && (fn_lower.contains("basecolor") || fn_lower.contains("base_color") || fn_lower.contains("diff") || fn_lower.contains("albedo") || fn_lower.contains("color") || fn_lower.contains("alb"))) {
-							albedo_tex = _load_texture_robust(full_path);
-						} else if (normal_tex.is_null() && (fn_lower.contains("normal") || fn_lower.contains("nor_gl") || fn_lower.contains("nor") || fn_lower.contains("nrm"))) {
-							normal_tex = _load_texture_robust(full_path);
-						} else if (rough_tex.is_null() && (fn_lower.contains("roughness") || fn_lower.contains("rough") || fn_lower.contains("arm") || fn_lower.contains("orm") || fn_lower.contains("rgh"))) {
-							rough_tex = _load_texture_robust(full_path);
-						} else if (metal_tex.is_null() && (fn_lower.contains("metallic") || fn_lower.contains("metal") || fn_lower.contains("met"))) {
-							metal_tex = _load_texture_robust(full_path);
-						} else if (emit_tex.is_null() && (fn_lower.contains("emissive") || fn_lower.contains("emission") || fn_lower.contains("emit"))) {
-							emit_tex = _load_texture_robust(full_path);
-						} else if (ao_tex.is_null() && (fn_lower.contains("occlusion") || fn_lower.contains("_ao") || fn_lower.contains("ao_") || fn_lower.contains("ao."))) {
-							ao_tex = _load_texture_robust(full_path);
-						} else if (opacity_tex.is_null() && (fn_lower.contains("opacity") || fn_lower.contains("alpha") || fn_lower.contains("mask"))) {
-							opacity_tex = _load_texture_robust(full_path);
+						if (matches_mat) {
+							if (albedo_tex.is_null() && (fn_lower.contains("basecolor") || fn_lower.contains("base_color") || fn_lower.contains("diff") || fn_lower.contains("albedo") || fn_lower.contains("color") || fn_lower.contains("alb"))) {
+								albedo_tex = _load_texture_robust(full_path);
+							} else if (normal_tex.is_null() && (fn_lower.contains("normal") || fn_lower.contains("nor_gl") || fn_lower.contains("nor") || fn_lower.contains("nrm"))) {
+								normal_tex = _load_texture_robust(full_path);
+							} else if (rough_tex.is_null() && (fn_lower.contains("roughness") || fn_lower.contains("rough") || fn_lower.contains("arm") || fn_lower.contains("orm") || fn_lower.contains("rgh"))) {
+								rough_tex = _load_texture_robust(full_path);
+							} else if (metal_tex.is_null() && (fn_lower.contains("metallic") || fn_lower.contains("metal") || fn_lower.contains("met"))) {
+								metal_tex = _load_texture_robust(full_path);
+							} else if (emit_tex.is_null() && (fn_lower.contains("emissive") || fn_lower.contains("emission") || fn_lower.contains("emit"))) {
+								emit_tex = _load_texture_robust(full_path);
+							} else if (ao_tex.is_null() && (fn_lower.contains("occlusion") || fn_lower.contains("_ao") || fn_lower.contains("ao_") || fn_lower.contains("ao."))) {
+								ao_tex = _load_texture_robust(full_path);
+							} else if (opacity_tex.is_null() && (fn_lower.contains("opacity") || fn_lower.contains("alpha") || fn_lower.contains("mask"))) {
+								opacity_tex = _load_texture_robust(full_path);
+							}
 						}
 					}
 				}
+				f_name = da->get_next();
 			}
-			f_name = da->get_next();
-		}
-		da->list_dir_end();
-	}
-
-	// Fallback for generic materials (e.g. Material.001, Checker, Door, Window) if no specific texture match
-	if (!all_candidate_images.is_empty()) {
-		for (int i = 0; i < all_candidate_images.size(); ++i) {
-			String fn = all_candidate_images[i].to_lower();
-			if (albedo_tex.is_null() && (fn.contains("image_") || fn.contains("diff") || fn.contains("basecolor") || fn.contains("base_color") || fn.contains("albedo") || fn.contains("color") || fn.contains("alb"))) {
-				albedo_tex = _load_texture_robust(all_candidate_images[i]);
-			} else if (normal_tex.is_null() && (fn.contains("normal") || fn.contains("nor_gl") || fn.contains("nor") || fn.contains("nrm"))) {
-				normal_tex = _load_texture_robust(all_candidate_images[i]);
-			} else if (rough_tex.is_null() && (fn.contains("roughness") || fn.contains("rough") || fn.contains("arm") || fn.contains("orm") || fn.contains("rgh"))) {
-				rough_tex = _load_texture_robust(all_candidate_images[i]);
-			} else if (metal_tex.is_null() && (fn.contains("metallic") || fn.contains("metal") || fn.contains("met"))) {
-				metal_tex = _load_texture_robust(all_candidate_images[i]);
-			} else if (ao_tex.is_null() && (fn.contains("occlusion") || fn.contains("_ao") || fn.contains("ao_") || fn.contains("ao."))) {
-				ao_tex = _load_texture_robust(all_candidate_images[i]);
-			} else if (emit_tex.is_null() && (fn.contains("emissive") || fn.contains("emission") || fn.contains("emit"))) {
-				emit_tex = _load_texture_robust(all_candidate_images[i]);
-			}
+			da->list_dir_end();
 		}
 	}
 
 	if (albedo_tex.is_valid()) {
 		mat->set_texture(BaseMaterial3D::TEXTURE_ALBEDO, albedo_tex);
-		mat->set_flag(BaseMaterial3D::FLAG_ALBEDO_TEXTURE_FORCE_SRGB, true);
+		// If albedo tint was completely black or uninitialized, ensure texture color comes through cleanly
+		if (mat->get_albedo().r <= 0.001f && mat->get_albedo().g <= 0.001f && mat->get_albedo().b <= 0.001f) {
+			mat->set_albedo(Color(1.0f, 1.0f, 1.0f, mat->get_albedo().a <= 0.001f ? 1.0f : mat->get_albedo().a));
+		}
 	}
 	if (normal_tex.is_valid()) {
 		mat->set_texture(BaseMaterial3D::TEXTURE_NORMAL, normal_tex);
@@ -735,10 +713,6 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 			mat->set_texture(BaseMaterial3D::TEXTURE_METALLIC, rough_tex);
 			mat->set_metallic_texture_channel(BaseMaterial3D::TEXTURE_CHANNEL_BLUE);
 		}
-		// Legacy fallback for .zmat files cooked before the explicit AO binding
-		// existed: infer packed AO from the roughness texture's filename. Only
-		// used if nothing more explicit (packed-ORM binding or dedicated AO
-		// binding/filename match) already supplied one.
 		if (ao_tex.is_null() && (rough_tex->get_path().to_lower().contains("arm") || rough_tex->get_path().to_lower().contains("orm"))) {
 			ao_tex = rough_tex;
 		}
@@ -750,6 +724,10 @@ Ref<Resource> ResourceFormatLoaderZMat::load(const String &p_path, const String 
 	if (emit_tex.is_valid()) {
 		mat->set_texture(BaseMaterial3D::TEXTURE_EMISSION, emit_tex);
 		mat->set_feature(BaseMaterial3D::FEATURE_EMISSION, true);
+		Color cur_emiss = mat->get_emission();
+		if (cur_emiss.r <= 0.001f && cur_emiss.g <= 0.001f && cur_emiss.b <= 0.001f) {
+			mat->set_emission(Color(1.0f, 1.0f, 1.0f));
+		}
 	}
 	if (opacity_tex.is_valid()) {
 		mat->set_transparency(BaseMaterial3D::TRANSPARENCY_ALPHA_SCISSOR);
