@@ -288,6 +288,10 @@ thirdparty/swappy-frame-pacing/x86_64/abi.json
 
 thirdparty/perfetto/
 
+#Game Folders
+
+OldSunford/*
+
 # Visual Studio 2015/2017 cache/options directory
 .vs/
 
@@ -406,3 +410,5 @@ $RECYCLE.BIN/
 *.msp
 *.lnk
 *.generated.props
+
+
