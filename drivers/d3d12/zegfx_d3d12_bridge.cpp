@@ -190,8 +190,8 @@ bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, 
 	return true;
 }
 
-// --- Phase 2: AO pass — computes and routes ZeGFX GTAO & Bilateral Spatial Denoiser ---
-bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity) {
+// --- Phase 2: AO pass — computes and routes ZeGFX DXR RTAO & GTAO ---
+bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity, float p_power, int p_samples) {
 	if (!initialized) {
 		return false;
 	}
@@ -202,6 +202,8 @@ bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius
 	pending_ao.height = p_height;
 	pending_ao.radius = p_radius;
 	pending_ao.intensity = p_intensity;
+	pending_ao.power = p_power;
+	pending_ao.samples = p_samples;
 
 	// Propagate AO settings to the PostComposite subsystem immediately
 	if (post_composite && post_composite->is_initialized()) {
@@ -249,6 +251,36 @@ bool ZeGFXD3D12Bridge::execute_dxr_gi_pass(int p_width, int p_height, float p_ma
 	pending_dxr_gi.max_distance = p_max_distance;
 	pending_dxr_gi.energy = p_energy;
 	pending_dxr_gi.bounce_count = p_bounce_count;
+
+	return true;
+}
+
+bool ZeGFXD3D12Bridge::execute_dxr_shadow_pass(int p_width, int p_height, const float p_light_dir[3], const float p_light_pos[3], float p_max_distance, float p_softness, int p_samples, int p_light_type) {
+	if (!initialized) {
+		return false;
+	}
+
+	if (!dxr_pipeline || !dxr_pipeline->is_dxr_supported()) {
+		return false;
+	}
+
+	pending_dxr_shadow.dirty = true;
+	pending_dxr_shadow.width = p_width;
+	pending_dxr_shadow.height = p_height;
+	if (p_light_dir) {
+		pending_dxr_shadow.light_dir[0] = p_light_dir[0];
+		pending_dxr_shadow.light_dir[1] = p_light_dir[1];
+		pending_dxr_shadow.light_dir[2] = p_light_dir[2];
+	}
+	if (p_light_pos) {
+		pending_dxr_shadow.light_pos[0] = p_light_pos[0];
+		pending_dxr_shadow.light_pos[1] = p_light_pos[1];
+		pending_dxr_shadow.light_pos[2] = p_light_pos[2];
+	}
+	pending_dxr_shadow.max_distance = p_max_distance;
+	pending_dxr_shadow.softness = p_softness;
+	pending_dxr_shadow.samples = p_samples;
+	pending_dxr_shadow.light_type = p_light_type;
 
 	return true;
 }
@@ -439,10 +471,12 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		pending_ao.dirty = false;
 		pending_dxr_reflections.dirty = false;
 		pending_dxr_gi.dirty = false;
+		pending_dxr_shadow.dirty = false;
 		pending_post_process.dirty = false;
 		ao_pass_succeeded = false;
 		dxr_reflections_succeeded = false;
 		dxr_gi_succeeded = false;
+		dxr_shadows_succeeded = false;
 		pending_meshlet_streams.clear();
 		return;
 	}
@@ -450,6 +484,7 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	ao_pass_succeeded = false;
 	dxr_reflections_succeeded = false;
 	dxr_gi_succeeded = false;
+	dxr_shadows_succeeded = false;
 
 	// Clear the render graph for this frame
 	frame_render_graph->clear();
@@ -496,13 +531,14 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	}
 
 	bool has_work = pending_ao.dirty || pending_dxr_reflections.dirty ||
-			pending_dxr_gi.dirty || pending_post_process.dirty ||
+			pending_dxr_gi.dirty || pending_dxr_shadow.dirty || pending_post_process.dirty ||
 			pending_meshlet_streams.size() > 0;
 
 	if (!has_work) {
 		ao_pass_succeeded = false;
 		dxr_reflections_succeeded = false;
 		dxr_gi_succeeded = false;
+		dxr_shadows_succeeded = false;
 		return;
 	}
 
@@ -543,8 +579,25 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 				scene_color_id, scene_depth_id, velocity_id);
 	}
 
-	// Schedule GTAO passes via RenderGraph
-	if (pending_ao.dirty) {
+	// Execute DXR ray-traced Ambient Occlusion (RTAO) when scheduled and hardware pipeline is fully ready
+	if (pending_ao.dirty && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && effective_cmd_list) {
+		dxr_pipeline->dispatch_ao_rays(
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
+				static_cast<ID3D12Resource *>(p_hdr_target),
+				static_cast<ID3D12Resource *>(p_depth_target),
+				static_cast<ID3D12Resource *>(p_normal_target),
+				p_width, p_height,
+				pending_ao.radius,
+				pending_ao.intensity,
+				pending_ao.power,
+				pending_ao.samples);
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+		ao_pass_succeeded = true;
+#else
+		ao_pass_succeeded = false;
+#endif
+	} else if (pending_ao.dirty) {
+		// Fallback to ZeGFX PostComposite GTAO compute pass when DXR hardware is unavailable
 		zegfx::RenderResourceId scene_depth_id = 0;
 		zegfx::RenderResourceId scene_normal_id = 0;
 		frame_render_graph->findResource("SceneDepth", scene_depth_id);
@@ -600,6 +653,29 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		dxr_gi_succeeded = false;
 	}
 
+	// Execute DXR ray-traced shadows when scheduled and hardware pipeline is fully ready
+	if (pending_dxr_shadow.dirty && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && effective_cmd_list) {
+		dxr_pipeline->dispatch_shadow_rays(
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
+				static_cast<ID3D12Resource *>(p_hdr_target),
+				static_cast<ID3D12Resource *>(p_depth_target),
+				static_cast<ID3D12Resource *>(p_normal_target),
+				p_width, p_height,
+				pending_dxr_shadow.light_dir,
+				pending_dxr_shadow.light_pos,
+				pending_dxr_shadow.max_distance,
+				pending_dxr_shadow.softness,
+				pending_dxr_shadow.samples,
+				pending_dxr_shadow.light_type);
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+		dxr_shadows_succeeded = true;
+#else
+		dxr_shadows_succeeded = false;
+#endif
+	} else {
+		dxr_shadows_succeeded = false;
+	}
+
 	// Execute 3D Froxel Volumetric Fog integration
 	if (volumetrics_pass && volumetrics_pass->is_initialized()) {
 		ID3D12GraphicsCommandList *vol_cmd = (async_vol_enabled && async_cmd) ? async_cmd : static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list);
@@ -638,11 +714,12 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	pending_ao.dirty = false;
 	pending_dxr_reflections.dirty = false;
 	pending_dxr_gi.dirty = false;
+	pending_dxr_shadow.dirty = false;
 	pending_post_process.dirty = false;
 	pending_meshlet_streams.clear();
 
 	// Reset per-frame replacement flags (they'll be set again next frame by execute_*_pass calls)
-	// Note: we do NOT reset ao_pass_succeeded / dxr_reflections_succeeded / dxr_gi_succeeded here because
+	// Note: we do NOT reset ao_pass_succeeded / dxr_reflections_succeeded / dxr_gi_succeeded / dxr_shadows_succeeded here because
 	// the Godot callsites that check them run AFTER execute_*_pass but BEFORE flush_deferred_passes.
 	// They will be reset at the start of the next frame's flush.
 }

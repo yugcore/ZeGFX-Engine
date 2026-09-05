@@ -588,4 +588,105 @@ void DXRPipelineD3D12::dispatch_gi_rays(
     cmd_list4->Release();
 }
 
+void DXRPipelineD3D12::dispatch_shadow_rays(
+    ID3D12GraphicsCommandList* p_cmd_list,
+    ID3D12Resource* p_hdr_target,
+    ID3D12Resource* p_depth_target,
+    ID3D12Resource* p_normal_target,
+    int p_width,
+    int p_height,
+    const float p_light_dir[3],
+    const float p_light_pos[3],
+    float p_max_distance,
+    float p_softness,
+    int p_samples,
+    int p_light_type
+) {
+    if (!initialized || !dxr_supported || !p_cmd_list || !p_hdr_target) return;
+
+    ID3D12GraphicsCommandList4* cmd_list4 = nullptr;
+    if (FAILED(p_cmd_list->QueryInterface(IID_PPV_ARGS(&cmd_list4))) || !cmd_list4) {
+        return;
+    }
+
+    if (rtx_state_object && global_root_sig && sbt_buffer) {
+        cmd_list4->SetPipelineState1(rtx_state_object);
+        cmd_list4->SetComputeRootSignature(global_root_sig);
+
+        DXRShadowConstants constants = {};
+        if (p_light_dir) {
+            constants.light_direction[0] = p_light_dir[0];
+            constants.light_direction[1] = p_light_dir[1];
+            constants.light_direction[2] = p_light_dir[2];
+        }
+        if (p_light_pos) {
+            constants.light_position[0] = p_light_pos[0];
+            constants.light_position[1] = p_light_pos[1];
+            constants.light_position[2] = p_light_pos[2];
+        }
+        constants.max_distance = p_max_distance;
+        constants.softness = p_softness;
+        constants.samples = static_cast<uint32_t>(p_samples);
+        constants.light_type = static_cast<uint32_t>(p_light_type);
+        constants.width = static_cast<uint32_t>(p_width);
+        constants.height = static_cast<uint32_t>(p_height);
+
+        cmd_list4->SetComputeRoot32BitConstants(0, sizeof(DXRShadowConstants) / 4, &constants, 0);
+
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+        dispatch_desc.Width = static_cast<UINT>(p_width);
+        dispatch_desc.Height = static_cast<UINT>(p_height);
+        dispatch_desc.Depth = 1;
+        cmd_list4->DispatchRays(&dispatch_desc);
+#endif
+    }
+
+    cmd_list4->Release();
+}
+
+void DXRPipelineD3D12::dispatch_ao_rays(
+    ID3D12GraphicsCommandList* p_cmd_list,
+    ID3D12Resource* p_hdr_target,
+    ID3D12Resource* p_depth_target,
+    ID3D12Resource* p_normal_target,
+    int p_width,
+    int p_height,
+    float p_radius,
+    float p_intensity,
+    float p_power,
+    int p_samples
+) {
+    if (!initialized || !dxr_supported || !p_cmd_list || !p_hdr_target) return;
+
+    ID3D12GraphicsCommandList4* cmd_list4 = nullptr;
+    if (FAILED(p_cmd_list->QueryInterface(IID_PPV_ARGS(&cmd_list4))) || !cmd_list4) {
+        return;
+    }
+
+    if (rtx_state_object && global_root_sig && sbt_buffer) {
+        cmd_list4->SetPipelineState1(rtx_state_object);
+        cmd_list4->SetComputeRootSignature(global_root_sig);
+
+        DXRAmbientOcclusionConstants constants = {};
+        constants.radius = p_radius;
+        constants.intensity = p_intensity;
+        constants.power = p_power;
+        constants.samples = static_cast<uint32_t>(p_samples);
+        constants.width = static_cast<uint32_t>(p_width);
+        constants.height = static_cast<uint32_t>(p_height);
+
+        cmd_list4->SetComputeRoot32BitConstants(0, sizeof(DXRAmbientOcclusionConstants) / 4, &constants, 0);
+
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+        dispatch_desc.Width = static_cast<UINT>(p_width);
+        dispatch_desc.Height = static_cast<UINT>(p_height);
+        dispatch_desc.Depth = 1;
+        cmd_list4->DispatchRays(&dispatch_desc);
+#endif
+    }
+
+    cmd_list4->Release();
+}
+
 #endif // WITH_DX12_BACKEND
+

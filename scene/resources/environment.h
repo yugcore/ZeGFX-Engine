@@ -134,10 +134,16 @@ private:
 	bool dxr_ao_enabled = true;
 	float dxr_ao_radius = 1.5f;
 	float dxr_ao_intensity = 1.0f;
+	float dxr_ao_power = 1.0f;
+	int dxr_ao_samples = 4;
 	bool dxr_gi_enabled = true;
 	float dxr_gi_max_distance = 64.0f;
 	float dxr_gi_energy = 1.0f;
 	int dxr_gi_bounce_count = 1;
+	bool dxr_shadows_enabled = true;
+	float dxr_shadow_softness = 1.0f;
+	float dxr_shadow_max_distance = 150.0f;
+	int dxr_shadow_samples = 1;
 	void _update_dxr();
 
 	// SSAO
@@ -314,6 +320,10 @@ public:
 	float get_dxr_ao_radius() const;
 	void set_dxr_ao_intensity(float p_intensity);
 	float get_dxr_ao_intensity() const;
+	void set_dxr_ao_power(float p_power);
+	float get_dxr_ao_power() const;
+	void set_dxr_ao_samples(int p_samples);
+	int get_dxr_ao_samples() const;
 	void set_dxr_gi_enabled(bool p_enabled);
 	bool is_dxr_gi_enabled() const;
 	void set_dxr_gi_max_distance(float p_distance);
@@ -322,6 +332,14 @@ public:
 	float get_dxr_gi_energy() const;
 	void set_dxr_gi_bounce_count(int p_count);
 	int get_dxr_gi_bounce_count() const;
+	void set_dxr_shadows_enabled(bool p_enabled);
+	bool is_dxr_shadows_enabled() const;
+	void set_dxr_shadow_softness(float p_softness);
+	float get_dxr_shadow_softness() const;
+	void set_dxr_shadow_max_distance(float p_distance);
+	float get_dxr_shadow_max_distance() const;
+	void set_dxr_shadow_samples(int p_samples);
+	int get_dxr_shadow_samples() const;
 
 	// SSAO
 	void set_ssao_enabled(bool p_enabled);

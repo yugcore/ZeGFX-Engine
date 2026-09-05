@@ -711,12 +711,14 @@ float RendererEnvironmentStorage::environment_get_dxr_reflection_roughness(RID p
 	return env->dxr_reflection_roughness;
 }
 
-void RendererEnvironmentStorage::environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity) {
+void RendererEnvironmentStorage::environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, int p_samples) {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL(env);
 	env->dxr_ao_enabled = p_enable;
 	env->dxr_ao_radius = p_radius;
 	env->dxr_ao_intensity = p_intensity;
+	env->dxr_ao_power = p_power;
+	env->dxr_ao_samples = p_samples;
 }
 
 bool RendererEnvironmentStorage::environment_get_dxr_ao_enabled(RID p_env) const {
@@ -735,6 +737,18 @@ float RendererEnvironmentStorage::environment_get_dxr_ao_intensity(RID p_env) co
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, 1.0f);
 	return env->dxr_ao_intensity;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_ao_power(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1.0f);
+	return env->dxr_ao_power;
+}
+
+int RendererEnvironmentStorage::environment_get_dxr_ao_samples(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 4);
+	return env->dxr_ao_samples;
 }
 
 void RendererEnvironmentStorage::environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count) {
@@ -768,6 +782,39 @@ int RendererEnvironmentStorage::environment_get_dxr_gi_bounce_count(RID p_env) c
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL_V(env, 1);
 	return env->dxr_gi_bounce_count;
+}
+
+void RendererEnvironmentStorage::environment_set_dxr_shadows(RID p_env, bool p_enable, float p_softness, float p_max_distance, int p_samples) {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL(env);
+	env->dxr_shadows_enabled = p_enable;
+	env->dxr_shadow_softness = p_softness;
+	env->dxr_shadow_max_distance = p_max_distance;
+	env->dxr_shadow_samples = p_samples;
+}
+
+bool RendererEnvironmentStorage::environment_get_dxr_shadows_enabled(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, true);
+	return env->dxr_shadows_enabled;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_shadow_softness(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1.0f);
+	return env->dxr_shadow_softness;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_shadow_max_distance(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 150.0f);
+	return env->dxr_shadow_max_distance;
+}
+
+int RendererEnvironmentStorage::environment_get_dxr_shadow_samples(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1);
+	return env->dxr_shadow_samples;
 }
 
 // SSAO

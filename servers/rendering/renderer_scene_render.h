@@ -217,10 +217,12 @@ public:
 
 	// SSAO
 	void environment_set_ssao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, float p_detail, float p_horizon, float p_sharpness, float p_light_affect, float p_ao_channel_affect);
-	void environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity);
+	void environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, int p_samples);
 	bool environment_get_dxr_ao_enabled(RID p_env) const;
 	float environment_get_dxr_ao_radius(RID p_env) const;
 	float environment_get_dxr_ao_intensity(RID p_env) const;
+	float environment_get_dxr_ao_power(RID p_env) const;
+	int environment_get_dxr_ao_samples(RID p_env) const;
 	bool environment_get_ssao_enabled(RID p_env) const;
 	float environment_get_ssao_radius(RID p_env) const;
 	float environment_get_ssao_intensity(RID p_env) const;
@@ -250,6 +252,11 @@ public:
 	float environment_get_dxr_gi_max_distance(RID p_env) const;
 	float environment_get_dxr_gi_energy(RID p_env) const;
 	int environment_get_dxr_gi_bounce_count(RID p_env) const;
+	void environment_set_dxr_shadows(RID p_env, bool p_enable, float p_softness, float p_max_distance, int p_samples);
+	bool environment_get_dxr_shadows_enabled(RID p_env) const;
+	float environment_get_dxr_shadow_softness(RID p_env) const;
+	float environment_get_dxr_shadow_max_distance(RID p_env) const;
+	int environment_get_dxr_shadow_samples(RID p_env) const;
 	bool environment_get_sdfgi_enabled(RID p_env) const;
 	int environment_get_sdfgi_cascades(RID p_env) const;
 	float environment_get_sdfgi_min_cell_size(RID p_env) const;

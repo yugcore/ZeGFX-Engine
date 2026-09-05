@@ -1319,7 +1319,7 @@ public:
 
 	// SSAO
 	PASS10(environment_set_ssao, RID, bool, float, float, float, float, float, float, float, float)
-	PASS4(environment_set_dxr_ao, RID, bool, float, float)
+	PASS6(environment_set_dxr_ao, RID, bool, float, float, float, int)
 
 	PASS1RC(bool, environment_get_ssao_enabled, RID)
 	PASS1RC(float, environment_get_ssao_radius, RID)
@@ -1348,6 +1348,7 @@ public:
 
 	PASS11(environment_set_sdfgi, RID, bool, int, float, RSE::EnvironmentSDFGIYScale, bool, float, bool, float, float, float)
 	PASS5(environment_set_dxr_gi, RID, bool, float, float, int)
+	PASS5(environment_set_dxr_shadows, RID, bool, float, float, int)
 
 	PASS1RC(bool, environment_get_sdfgi_enabled, RID)
 	PASS1RC(int, environment_get_sdfgi_cascades, RID)

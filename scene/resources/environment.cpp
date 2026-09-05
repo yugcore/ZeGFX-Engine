@@ -362,6 +362,24 @@ float Environment::get_dxr_ao_intensity() const {
 	return dxr_ao_intensity;
 }
 
+void Environment::set_dxr_ao_power(float p_power) {
+	dxr_ao_power = MAX(0.1f, p_power);
+	_update_dxr();
+}
+
+float Environment::get_dxr_ao_power() const {
+	return dxr_ao_power;
+}
+
+void Environment::set_dxr_ao_samples(int p_samples) {
+	dxr_ao_samples = CLAMP(p_samples, 1, 16);
+	_update_dxr();
+}
+
+int Environment::get_dxr_ao_samples() const {
+	return dxr_ao_samples;
+}
+
 void Environment::set_dxr_gi_enabled(bool p_enabled) {
 	dxr_gi_enabled = p_enabled;
 	_update_dxr();
@@ -398,6 +416,42 @@ int Environment::get_dxr_gi_bounce_count() const {
 	return dxr_gi_bounce_count;
 }
 
+void Environment::set_dxr_shadows_enabled(bool p_enabled) {
+	dxr_shadows_enabled = p_enabled;
+	_update_dxr();
+}
+
+bool Environment::is_dxr_shadows_enabled() const {
+	return dxr_shadows_enabled;
+}
+
+void Environment::set_dxr_shadow_softness(float p_softness) {
+	dxr_shadow_softness = MAX(0.0f, p_softness);
+	_update_dxr();
+}
+
+float Environment::get_dxr_shadow_softness() const {
+	return dxr_shadow_softness;
+}
+
+void Environment::set_dxr_shadow_max_distance(float p_distance) {
+	dxr_shadow_max_distance = MAX(1.0f, p_distance);
+	_update_dxr();
+}
+
+float Environment::get_dxr_shadow_max_distance() const {
+	return dxr_shadow_max_distance;
+}
+
+void Environment::set_dxr_shadow_samples(int p_samples) {
+	dxr_shadow_samples = CLAMP(p_samples, 1, 16);
+	_update_dxr();
+}
+
+int Environment::get_dxr_shadow_samples() const {
+	return dxr_shadow_samples;
+}
+
 void Environment::_update_dxr() {
 	if (RS::get_singleton()) {
 		RS::get_singleton()->environment_set_dxr_reflections(
@@ -408,13 +462,21 @@ void Environment::_update_dxr() {
 				environment,
 				dxr_ao_enabled,
 				dxr_ao_radius,
-				dxr_ao_intensity);
+				dxr_ao_intensity,
+				dxr_ao_power,
+				dxr_ao_samples);
 		RS::get_singleton()->environment_set_dxr_gi(
 				environment,
 				dxr_gi_enabled,
 				dxr_gi_max_distance,
 				dxr_gi_energy,
 				dxr_gi_bounce_count);
+		RS::get_singleton()->environment_set_dxr_shadows(
+				environment,
+				dxr_shadows_enabled,
+				dxr_shadow_softness,
+				dxr_shadow_max_distance,
+				dxr_shadow_samples);
 	}
 }
 
@@ -1451,6 +1513,10 @@ void Environment::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_dxr_ao_radius"), &Environment::get_dxr_ao_radius);
 	ClassDB::bind_method(D_METHOD("set_dxr_ao_intensity", "intensity"), &Environment::set_dxr_ao_intensity);
 	ClassDB::bind_method(D_METHOD("get_dxr_ao_intensity"), &Environment::get_dxr_ao_intensity);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_power", "power"), &Environment::set_dxr_ao_power);
+	ClassDB::bind_method(D_METHOD("get_dxr_ao_power"), &Environment::get_dxr_ao_power);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_samples", "samples"), &Environment::set_dxr_ao_samples);
+	ClassDB::bind_method(D_METHOD("get_dxr_ao_samples"), &Environment::get_dxr_ao_samples);
 	ClassDB::bind_method(D_METHOD("set_dxr_gi_enabled", "enabled"), &Environment::set_dxr_gi_enabled);
 	ClassDB::bind_method(D_METHOD("is_dxr_gi_enabled"), &Environment::is_dxr_gi_enabled);
 	ClassDB::bind_method(D_METHOD("set_dxr_gi_max_distance", "distance"), &Environment::set_dxr_gi_max_distance);
@@ -1459,6 +1525,14 @@ void Environment::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_dxr_gi_energy"), &Environment::get_dxr_gi_energy);
 	ClassDB::bind_method(D_METHOD("set_dxr_gi_bounce_count", "count"), &Environment::set_dxr_gi_bounce_count);
 	ClassDB::bind_method(D_METHOD("get_dxr_gi_bounce_count"), &Environment::get_dxr_gi_bounce_count);
+	ClassDB::bind_method(D_METHOD("set_dxr_shadows_enabled", "enabled"), &Environment::set_dxr_shadows_enabled);
+	ClassDB::bind_method(D_METHOD("is_dxr_shadows_enabled"), &Environment::is_dxr_shadows_enabled);
+	ClassDB::bind_method(D_METHOD("set_dxr_shadow_softness", "softness"), &Environment::set_dxr_shadow_softness);
+	ClassDB::bind_method(D_METHOD("get_dxr_shadow_softness"), &Environment::get_dxr_shadow_softness);
+	ClassDB::bind_method(D_METHOD("set_dxr_shadow_max_distance", "distance"), &Environment::set_dxr_shadow_max_distance);
+	ClassDB::bind_method(D_METHOD("get_dxr_shadow_max_distance"), &Environment::get_dxr_shadow_max_distance);
+	ClassDB::bind_method(D_METHOD("set_dxr_shadow_samples", "samples"), &Environment::set_dxr_shadow_samples);
+	ClassDB::bind_method(D_METHOD("get_dxr_shadow_samples"), &Environment::get_dxr_shadow_samples);
 
 	ADD_GROUP("Ray Tracing (DXR)", "dxr_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "dxr_reflections_enabled"), "set_dxr_reflections_enabled", "is_dxr_reflections_enabled");
@@ -1466,10 +1540,16 @@ void Environment::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "dxr_ao_enabled"), "set_dxr_ao_enabled", "is_dxr_ao_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_radius", PROPERTY_HINT_RANGE, "0.1,16.0,0.01"), "set_dxr_ao_radius", "get_dxr_ao_radius");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_intensity", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), "set_dxr_ao_intensity", "get_dxr_ao_intensity");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_power", PROPERTY_HINT_RANGE, "0.1,16.0,0.01"), "set_dxr_ao_power", "get_dxr_ao_power");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "dxr_ao_samples", PROPERTY_HINT_RANGE, "1,16,1"), "set_dxr_ao_samples", "get_dxr_ao_samples");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "dxr_gi_enabled"), "set_dxr_gi_enabled", "is_dxr_gi_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_gi_max_distance", PROPERTY_HINT_RANGE, "1.0,512.0,1.0"), "set_dxr_gi_max_distance", "get_dxr_gi_max_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_gi_energy", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), "set_dxr_gi_energy", "get_dxr_gi_energy");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "dxr_gi_bounce_count", PROPERTY_HINT_RANGE, "1,4,1"), "set_dxr_gi_bounce_count", "get_dxr_gi_bounce_count");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "dxr_shadows_enabled"), "set_dxr_shadows_enabled", "is_dxr_shadows_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_shadow_softness", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), "set_dxr_shadow_softness", "get_dxr_shadow_softness");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_shadow_max_distance", PROPERTY_HINT_RANGE, "1.0,1000.0,1.0"), "set_dxr_shadow_max_distance", "get_dxr_shadow_max_distance");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "dxr_shadow_samples", PROPERTY_HINT_RANGE, "1,16,1"), "set_dxr_shadow_samples", "get_dxr_shadow_samples");
 
 	// SSAO
 	ClassDB::bind_method(D_METHOD("set_ssao_enabled", "enabled"), &Environment::set_ssao_enabled);

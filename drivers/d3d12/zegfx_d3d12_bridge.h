@@ -68,6 +68,8 @@ private:
 		int height = 0;
 		float radius = 0.0f;
 		float intensity = 0.0f;
+		float power = 1.0f;
+		int samples = 4;
 	} pending_ao;
 
 	// --- Deferred DXR reflections state ---
@@ -87,6 +89,19 @@ private:
 		float energy = 1.0f;
 		int bounce_count = 1;
 	} pending_dxr_gi;
+
+	// --- Deferred DXR shadow state ---
+	struct PendingDXRShadow {
+		bool dirty = false;
+		int width = 0;
+		int height = 0;
+		float light_dir[3] = { 0.0f, -1.0f, 0.0f };
+		float light_pos[3] = { 0.0f, 0.0f, 0.0f };
+		float max_distance = 150.0f;
+		float softness = 1.0f;
+		int samples = 1;
+		int light_type = 0;
+	} pending_dxr_shadow;
 
 	// --- Deferred post-process state ---
 	struct PendingPostProcess {
@@ -122,6 +137,7 @@ private:
 	bool ao_pass_succeeded = false;
 	bool dxr_reflections_succeeded = false;
 	bool dxr_gi_succeeded = false;
+	bool dxr_shadows_succeeded = false;
 	bool active_cmd_list_attached = false;
 	void *active_cmd_list = nullptr;
 
@@ -166,17 +182,20 @@ public:
 	bool has_dxr_reflections_succeeded() const { return dxr_reflections_succeeded; }
 	bool dxr_gi_active() const { return initialized && dxr_gi_succeeded && active_cmd_list_attached; }
 	bool has_dxr_gi_succeeded() const { return dxr_gi_succeeded; }
+	bool dxr_shadows_active() const { return initialized && dxr_shadows_succeeded && active_cmd_list_attached; }
+	bool has_dxr_shadows_succeeded() const { return dxr_shadows_succeeded; }
 	bool post_composite_active() const { return initialized && post_composite != nullptr; }
 
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
 	bool execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits);
 
-	// Phase 2 Subsystem Swap: godotAO -> zegfxAO (GTAO)
-	bool execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity);
+	// Phase 2 Subsystem Swap: godotAO -> zegfxAO (DXR RTAO / GTAO)
+	bool execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity, float p_power = 1.0f, int p_samples = 4);
 
 	// Phase 3 Subsystem Swap: godotSSR -> zegfxDXR
 	bool execute_dxr_reflections_pass(int p_width, int p_height, float p_roughness_threshold);
 	bool execute_dxr_gi_pass(int p_width, int p_height, float p_max_distance, float p_energy, int p_bounce_count);
+	bool execute_dxr_shadow_pass(int p_width, int p_height, const float p_light_dir[3], const float p_light_pos[3], float p_max_distance, float p_softness, int p_samples, int p_light_type);
 
 	// Phase 4 Subsystem Swap: godotPost -> zegfxPost (Bloom + Auto-Exposure + ACES Tonemap + Sharpening)
 	bool execute_post_process_pass(int p_width, int p_height, float p_exposure, float p_bloom_intensity, int p_tonemap_mode, float p_sharpen, float p_vignette);

@@ -29,6 +29,27 @@ struct DXRGIConstants {
     uint32_t height = 0;
 };
 
+struct DXRShadowConstants {
+    float light_direction[4] = { 0.0f, -1.0f, 0.0f, 0.0f };
+    float light_position[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    float max_distance = 150.0f;
+    float softness = 1.0f;
+    uint32_t samples = 1;
+    uint32_t light_type = 0; // 0 = directional, 1 = spot/omni
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
+struct DXRAmbientOcclusionConstants {
+    float radius = 1.5f;
+    float intensity = 1.0f;
+    float power = 1.0f;
+    uint32_t samples = 4;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    float padding[2] = { 0.0f, 0.0f };
+};
+
 class DXRPipelineD3D12 {
 public:
     DXRPipelineD3D12();
@@ -68,6 +89,34 @@ public:
         float p_max_distance,
         float p_energy,
         int p_bounce_count
+    );
+
+    void dispatch_shadow_rays(
+        ID3D12GraphicsCommandList* p_cmd_list,
+        ID3D12Resource* p_hdr_target,
+        ID3D12Resource* p_depth_target,
+        ID3D12Resource* p_normal_target,
+        int p_width,
+        int p_height,
+        const float p_light_dir[3],
+        const float p_light_pos[3],
+        float p_max_distance,
+        float p_softness,
+        int p_samples,
+        int p_light_type
+    );
+
+    void dispatch_ao_rays(
+        ID3D12GraphicsCommandList* p_cmd_list,
+        ID3D12Resource* p_hdr_target,
+        ID3D12Resource* p_depth_target,
+        ID3D12Resource* p_normal_target,
+        int p_width,
+        int p_height,
+        float p_radius,
+        float p_intensity,
+        float p_power,
+        int p_samples
     );
 
 private:

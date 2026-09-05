@@ -69,12 +69,18 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
         CHECK(bridge.execute_shadow_pass(0.1f, 100.0f, 4, splits));
         CHECK(splits.size() == 3);
 
-        CHECK(bridge.execute_ao_pass(1920, 1080, 1.5f, 1.0f));
+        CHECK(bridge.execute_ao_pass(1920, 1080, 1.5f, 1.0f, 1.0f, 4));
         CHECK_FALSE(bridge.ao_pass_active()); // returns false because no command list is attached
 
         // DXR reflections will return false without ID3D12Device initialization
         CHECK_FALSE(bridge.execute_dxr_reflections_pass(1920, 1080, 0.5f));
         CHECK_FALSE(bridge.dxr_reflections_active());
+
+        // DXR shadows will return false without ID3D12Device initialization
+        float light_dir[3] = { 0.0f, -1.0f, 0.0f };
+        float light_pos[3] = { 0.0f, 10.0f, 0.0f };
+        CHECK_FALSE(bridge.execute_dxr_shadow_pass(1920, 1080, light_dir, light_pos, 150.0f, 1.0f, 1, 0));
+        CHECK_FALSE(bridge.dxr_shadows_active());
 
         CHECK(bridge.execute_post_process_pass(1920, 1080, 1.0f, 0.5f, 1, 0.04f, 0.1f));
 
@@ -135,6 +141,8 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
         CHECK(env->is_dxr_ao_enabled());
         CHECK(env->get_dxr_ao_radius() == doctest::Approx(1.5f));
         CHECK(env->get_dxr_ao_intensity() == doctest::Approx(1.0f));
+        CHECK(env->get_dxr_ao_power() == doctest::Approx(1.0f));
+        CHECK(env->get_dxr_ao_samples() == 4);
 
         env->set_dxr_ao_enabled(false);
         CHECK_FALSE(env->is_dxr_ao_enabled());
@@ -145,7 +153,7 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
         env->set_dxr_ao_radius(2.5f);
         CHECK(env->get_dxr_ao_radius() == doctest::Approx(2.5f));
 
-        // Test clamp bounds (radius >= 0.1, intensity >= 0.0)
+        // Test clamp bounds (radius >= 0.1, intensity >= 0.0, power >= 0.1, 1 <= samples <= 16)
         env->set_dxr_ao_radius(0.01f);
         CHECK(env->get_dxr_ao_radius() == doctest::Approx(0.1f));
 
@@ -154,6 +162,21 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
 
         env->set_dxr_ao_intensity(-1.0f);
         CHECK(env->get_dxr_ao_intensity() == doctest::Approx(0.0f));
+
+        env->set_dxr_ao_power(2.0f);
+        CHECK(env->get_dxr_ao_power() == doctest::Approx(2.0f));
+
+        env->set_dxr_ao_power(0.01f);
+        CHECK(env->get_dxr_ao_power() == doctest::Approx(0.1f));
+
+        env->set_dxr_ao_samples(8);
+        CHECK(env->get_dxr_ao_samples() == 8);
+
+        env->set_dxr_ao_samples(0);
+        CHECK(env->get_dxr_ao_samples() == 1);
+
+        env->set_dxr_ao_samples(32);
+        CHECK(env->get_dxr_ao_samples() == 16);
 
         // DXR GI validation
         CHECK(env->is_dxr_gi_enabled());
@@ -188,6 +211,40 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
 
         env->set_dxr_gi_bounce_count(10);
         CHECK(env->get_dxr_gi_bounce_count() == 4);
+
+        // DXR Shadows validation
+        CHECK(env->is_dxr_shadows_enabled());
+        CHECK(env->get_dxr_shadow_softness() == doctest::Approx(1.0f));
+        CHECK(env->get_dxr_shadow_max_distance() == doctest::Approx(150.0f));
+        CHECK(env->get_dxr_shadow_samples() == 1);
+
+        env->set_dxr_shadows_enabled(false);
+        CHECK_FALSE(env->is_dxr_shadows_enabled());
+
+        env->set_dxr_shadows_enabled(true);
+        CHECK(env->is_dxr_shadows_enabled());
+
+        env->set_dxr_shadow_softness(2.5f);
+        CHECK(env->get_dxr_shadow_softness() == doctest::Approx(2.5f));
+
+        env->set_dxr_shadow_max_distance(200.0f);
+        CHECK(env->get_dxr_shadow_max_distance() == doctest::Approx(200.0f));
+
+        env->set_dxr_shadow_samples(4);
+        CHECK(env->get_dxr_shadow_samples() == 4);
+
+        // Test clamp bounds (softness >= 0.0, max_distance >= 1.0, 1 <= samples <= 16)
+        env->set_dxr_shadow_softness(-1.0f);
+        CHECK(env->get_dxr_shadow_softness() == doctest::Approx(0.0f));
+
+        env->set_dxr_shadow_max_distance(0.5f);
+        CHECK(env->get_dxr_shadow_max_distance() == doctest::Approx(1.0f));
+
+        env->set_dxr_shadow_samples(0);
+        CHECK(env->get_dxr_shadow_samples() == 1);
+
+        env->set_dxr_shadow_samples(32);
+        CHECK(env->get_dxr_shadow_samples() == 16);
     }
 #endif
 }

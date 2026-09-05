@@ -1446,20 +1446,23 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 #if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
 		bool dxr_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/enabled");
-		bool dxr_ao_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/ao_enabled");
 		float radius = GLOBAL_GET("rendering/d3d12/raytracing/ao_radius");
 		float intensity = GLOBAL_GET("rendering/d3d12/raytracing/ao_intensity");
+		float power = GLOBAL_GET("rendering/d3d12/raytracing/ao_power");
+		int samples = GLOBAL_GET("rendering/d3d12/raytracing/ao_samples");
 
 		bool dxr_ao_allowed = dxr_global_enabled && dxr_ao_global_enabled;
 		if (p_environment.is_valid()) {
 			dxr_ao_allowed = dxr_ao_allowed && environment_get_dxr_ao_enabled(p_environment);
 			radius = environment_get_dxr_ao_radius(p_environment);
 			intensity = environment_get_dxr_ao_intensity(p_environment);
+			power = environment_get_dxr_ao_power(p_environment);
+			samples = environment_get_dxr_ao_samples(p_environment);
 		}
 
 		if (dxr_ao_allowed) {
 			Size2i size = p_render_buffers->get_internal_size();
-			if (ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity)) {
+			if (ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity, power, samples)) {
 				if (ZeGFXD3D12Bridge::get_singleton()->ao_pass_active()) {
 					return;
 				}
@@ -1642,6 +1645,60 @@ void RenderForwardClustered::_pre_opaque_render(RenderDataRD *p_render_data, boo
 
 	bool render_shadows = p_render_data->directional_shadows.size() || p_render_data->shadows.size();
 	bool render_gi = rb.is_valid() && p_use_gi;
+	bool dxr_shadows_dispatched = false;
+
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+	if (render_shadows && ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+		bool dxr_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/enabled");
+		bool dxr_shadows_enabled = GLOBAL_GET("rendering/d3d12/raytracing/shadows_enabled");
+		float softness = GLOBAL_GET("rendering/d3d12/raytracing/shadow_softness");
+		float max_distance = GLOBAL_GET("rendering/d3d12/raytracing/shadow_max_distance");
+		int samples = GLOBAL_GET("rendering/d3d12/raytracing/shadow_samples");
+
+		bool dxr_allowed = dxr_global_enabled && dxr_shadows_enabled;
+		if (p_render_data->environment.is_valid()) {
+			dxr_allowed = dxr_allowed && environment_get_dxr_shadows_enabled(p_render_data->environment);
+			softness = environment_get_dxr_shadow_softness(p_render_data->environment);
+			max_distance = environment_get_dxr_shadow_max_distance(p_render_data->environment);
+			samples = environment_get_dxr_shadow_samples(p_render_data->environment);
+		}
+
+		if (dxr_allowed) {
+			Size2i size = rb.is_valid() ? rb->get_internal_size() : viewport_size;
+			float light_dir[3] = { 0.0f, -1.0f, 0.0f };
+			float light_pos[3] = { 0.0f, 10.0f, 0.0f };
+			int light_type = 0; // 0 = Directional, 1 = Spot
+
+			if (p_render_data->directional_shadows.size() > 0) {
+				RID light_inst = p_render_data->render_shadows[p_render_data->directional_shadows[0]].light;
+				Transform3D light_transform = light_storage->light_instance_get_shadow_transform(light_inst, 0);
+				Vector3 dir = light_transform.basis.xform(Vector3(0, 0, 1)).normalized();
+				light_dir[0] = dir.x;
+				light_dir[1] = dir.y;
+				light_dir[2] = dir.z;
+				light_type = 0;
+			} else if (p_render_data->shadows.size() > 0) {
+				RID light_inst = p_render_data->render_shadows[p_render_data->shadows[0]].light;
+				Transform3D light_transform = light_storage->light_instance_get_shadow_transform(light_inst, 0);
+				Vector3 pos = light_transform.origin;
+				Vector3 dir = light_transform.basis.xform(Vector3(0, 0, -1)).normalized();
+				light_pos[0] = pos.x;
+				light_pos[1] = pos.y;
+				light_pos[2] = pos.z;
+				light_dir[0] = dir.x;
+				light_dir[1] = dir.y;
+				light_dir[2] = dir.z;
+				light_type = 1;
+			}
+
+			if (ZeGFXD3D12Bridge::get_singleton()->execute_dxr_shadow_pass(size.x, size.y, light_dir, light_pos, max_distance, softness, samples, light_type)) {
+				if (ZeGFXD3D12Bridge::get_singleton()->dxr_shadows_active()) {
+					dxr_shadows_dispatched = true;
+				}
+			}
+		}
+	}
+#endif
 
 	if (render_shadows && render_gi) {
 		RENDER_TIMESTAMP("Render GI + Render Directional/SpotLight Shadows (Parallel)");
@@ -1652,7 +1709,7 @@ void RenderForwardClustered::_pre_opaque_render(RenderDataRD *p_render_data, boo
 	}
 
 	//prepare shadow rendering
-	if (render_shadows) {
+	if (render_shadows && !dxr_shadows_dispatched) {
 		_render_shadow_begin();
 
 		//render directional shadows
@@ -1703,7 +1760,7 @@ void RenderForwardClustered::_pre_opaque_render(RenderDataRD *p_render_data, boo
 #endif
 	}
 
-	if (render_shadows) {
+	if (render_shadows && !dxr_shadows_dispatched) {
 		_render_shadow_end();
 	}
 
