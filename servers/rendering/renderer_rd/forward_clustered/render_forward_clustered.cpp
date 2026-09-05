@@ -1446,6 +1446,7 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 #if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
 		bool dxr_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/enabled");
+		bool dxr_ao_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/ao_enabled");
 		float radius = GLOBAL_GET("rendering/d3d12/raytracing/ao_radius");
 		float intensity = GLOBAL_GET("rendering/d3d12/raytracing/ao_intensity");
 		float power = GLOBAL_GET("rendering/d3d12/raytracing/ao_power");
