@@ -3365,7 +3365,7 @@ Error ResourceImporterScene::import(ResourceUID::ID p_source_id, const String &p
 
 			// Register the cooked asset with the bridge for runtime meshlet streaming.
 			if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
-				ZeGFXD3D12Bridge::get_singleton()->cook_and_load_zmesh(global_src, global_out);
+				ZeGFXD3D12Bridge::get_singleton()->execute_meshlet_streamer_pass(global_out, 0, 1);
 			}
 		} else {
 			WARN_PRINT(vformat("ZeGFX AssetCooker failed for '%s' (%s). Automatically degrading to Native Import Mode.", src_path, String(cook_res.errorMessage.c_str())));

@@ -571,6 +571,18 @@ void RendererSceneRender::environment_set_ssr(RID p_env, bool p_enable, int p_ma
 	environment_storage.environment_set_ssr(p_env, p_enable, p_max_steps, p_fade_int, p_fade_out, p_depth_tolerance);
 }
 
+void RendererSceneRender::environment_set_dxr_reflections(RID p_env, bool p_enable, float p_roughness_threshold) {
+	environment_storage.environment_set_dxr_reflections(p_env, p_enable, p_roughness_threshold);
+}
+
+bool RendererSceneRender::environment_get_dxr_reflections_enabled(RID p_env) const {
+	return environment_storage.environment_get_dxr_reflections_enabled(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_reflection_roughness(RID p_env) const {
+	return environment_storage.environment_get_dxr_reflection_roughness(p_env);
+}
+
 bool RendererSceneRender::environment_get_ssr_enabled(RID p_env) const {
 	return environment_storage.environment_get_ssr_enabled(p_env);
 }
@@ -595,6 +607,42 @@ float RendererSceneRender::environment_get_ssr_depth_tolerance(RID p_env) const 
 
 void RendererSceneRender::environment_set_ssao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, float p_detail, float p_horizon, float p_sharpness, float p_light_affect, float p_ao_channel_affect) {
 	environment_storage.environment_set_ssao(p_env, p_enable, p_radius, p_intensity, p_power, p_detail, p_horizon, p_sharpness, p_light_affect, p_ao_channel_affect);
+}
+
+void RendererSceneRender::environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity) {
+	environment_storage.environment_set_dxr_ao(p_env, p_enable, p_radius, p_intensity);
+}
+
+bool RendererSceneRender::environment_get_dxr_ao_enabled(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_enabled(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_ao_radius(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_radius(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_ao_intensity(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_intensity(p_env);
+}
+
+void RendererSceneRender::environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count) {
+	environment_storage.environment_set_dxr_gi(p_env, p_enable, p_max_distance, p_energy, p_bounce_count);
+}
+
+bool RendererSceneRender::environment_get_dxr_gi_enabled(RID p_env) const {
+	return environment_storage.environment_get_dxr_gi_enabled(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_gi_max_distance(RID p_env) const {
+	return environment_storage.environment_get_dxr_gi_max_distance(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_gi_energy(RID p_env) const {
+	return environment_storage.environment_get_dxr_gi_energy(p_env);
+}
+
+int RendererSceneRender::environment_get_dxr_gi_bounce_count(RID p_env) const {
+	return environment_storage.environment_get_dxr_gi_bounce_count(p_env);
 }
 
 bool RendererSceneRender::environment_get_ssao_enabled(RID p_env) const {

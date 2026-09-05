@@ -690,6 +690,86 @@ float RendererEnvironmentStorage::environment_get_ssr_depth_tolerance(RID p_env)
 	return env->ssr_depth_tolerance;
 }
 
+// DXR
+
+void RendererEnvironmentStorage::environment_set_dxr_reflections(RID p_env, bool p_enable, float p_roughness_threshold) {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL(env);
+	env->dxr_reflections_enabled = p_enable;
+	env->dxr_reflection_roughness = p_roughness_threshold;
+}
+
+bool RendererEnvironmentStorage::environment_get_dxr_reflections_enabled(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, true);
+	return env->dxr_reflections_enabled;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_reflection_roughness(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 0.5f);
+	return env->dxr_reflection_roughness;
+}
+
+void RendererEnvironmentStorage::environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity) {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL(env);
+	env->dxr_ao_enabled = p_enable;
+	env->dxr_ao_radius = p_radius;
+	env->dxr_ao_intensity = p_intensity;
+}
+
+bool RendererEnvironmentStorage::environment_get_dxr_ao_enabled(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, true);
+	return env->dxr_ao_enabled;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_ao_radius(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1.5f);
+	return env->dxr_ao_radius;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_ao_intensity(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1.0f);
+	return env->dxr_ao_intensity;
+}
+
+void RendererEnvironmentStorage::environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count) {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL(env);
+	env->dxr_gi_enabled = p_enable;
+	env->dxr_gi_max_distance = p_max_distance;
+	env->dxr_gi_energy = p_energy;
+	env->dxr_gi_bounce_count = p_bounce_count;
+}
+
+bool RendererEnvironmentStorage::environment_get_dxr_gi_enabled(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, true);
+	return env->dxr_gi_enabled;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_gi_max_distance(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 64.0f);
+	return env->dxr_gi_max_distance;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_gi_energy(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1.0f);
+	return env->dxr_gi_energy;
+}
+
+int RendererEnvironmentStorage::environment_get_dxr_gi_bounce_count(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 1);
+	return env->dxr_gi_bounce_count;
+}
+
 // SSAO
 
 void RendererEnvironmentStorage::environment_set_ssao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, float p_detail, float p_horizon, float p_sharpness, float p_light_affect, float p_ao_channel_affect) {

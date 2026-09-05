@@ -23,6 +23,7 @@ public:
 
     bool initialize(ID3D12Device* device, const std::string& cacheDirectory = "");
     void shutdown();
+    bool is_initialized() const { return device_ != nullptr; }
 
     ID3D12PipelineState* getOrCreateGraphicsPipeline(
         ID3D12RootSignature* rootSignature,

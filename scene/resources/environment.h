@@ -128,6 +128,18 @@ private:
 	float ssr_depth_tolerance = 0.5;
 	void _update_ssr();
 
+	// DXR
+	bool dxr_reflections_enabled = true;
+	float dxr_reflection_roughness = 0.5f;
+	bool dxr_ao_enabled = true;
+	float dxr_ao_radius = 1.5f;
+	float dxr_ao_intensity = 1.0f;
+	bool dxr_gi_enabled = true;
+	float dxr_gi_max_distance = 64.0f;
+	float dxr_gi_energy = 1.0f;
+	int dxr_gi_bounce_count = 1;
+	void _update_dxr();
+
 	// SSAO
 	bool ssao_enabled = false;
 	float ssao_radius = 1.0;
@@ -290,6 +302,26 @@ public:
 	float get_ssr_fade_out() const;
 	void set_ssr_depth_tolerance(float p_depth_tolerance);
 	float get_ssr_depth_tolerance() const;
+
+	// DXR
+	void set_dxr_reflections_enabled(bool p_enabled);
+	bool is_dxr_reflections_enabled() const;
+	void set_dxr_reflection_roughness(float p_roughness);
+	float get_dxr_reflection_roughness() const;
+	void set_dxr_ao_enabled(bool p_enabled);
+	bool is_dxr_ao_enabled() const;
+	void set_dxr_ao_radius(float p_radius);
+	float get_dxr_ao_radius() const;
+	void set_dxr_ao_intensity(float p_intensity);
+	float get_dxr_ao_intensity() const;
+	void set_dxr_gi_enabled(bool p_enabled);
+	bool is_dxr_gi_enabled() const;
+	void set_dxr_gi_max_distance(float p_distance);
+	float get_dxr_gi_max_distance() const;
+	void set_dxr_gi_energy(float p_energy);
+	float get_dxr_gi_energy() const;
+	void set_dxr_gi_bounce_count(int p_count);
+	int get_dxr_gi_bounce_count() const;
 
 	// SSAO
 	void set_ssao_enabled(bool p_enabled);

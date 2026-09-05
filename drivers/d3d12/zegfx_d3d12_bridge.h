@@ -21,6 +21,7 @@
 class DXRPipelineD3D12;
 class PostCompositeD3D12;
 class VolumetricsPassD3D12;
+class GPUCommandQueueD3D12;
 
 namespace zegfx {
 class RenderGraph;
@@ -28,6 +29,7 @@ class ZPostProcessScheduler;
 class VirtualGeometryManager;
 class ZCullingContext;
 class ZSubmissionContext;
+class ZGPUScene;
 } // namespace zegfx
 
 // Bridge singleton wiring ZeGFX subsystems into Godot's
@@ -41,6 +43,8 @@ private:
 	DXRPipelineD3D12 *dxr_pipeline = nullptr;
 	PostCompositeD3D12 *post_composite = nullptr;
 	VolumetricsPassD3D12 *volumetrics_pass = nullptr;
+	GPUCommandQueueD3D12 *gpu_command_queue = nullptr;
+	void *main_direct_queue = nullptr;
 
 	// --- Render graph & GPU culling subsystems (owned) ---
 	zegfx::RenderGraph *frame_render_graph = nullptr;
@@ -48,6 +52,7 @@ private:
 	zegfx::VirtualGeometryManager *virtual_geom_manager = nullptr;
 	zegfx::ZCullingContext *culling_context = nullptr;
 	zegfx::ZSubmissionContext *submission_context = nullptr;
+	zegfx::ZGPUScene *gpu_scene = nullptr;
 
 	struct CullingViewData {
 		Transform3D cam_transform;
@@ -72,6 +77,16 @@ private:
 		int height = 0;
 		float roughness = 0.0f;
 	} pending_dxr_reflections;
+
+	// --- Deferred DXR GI state ---
+	struct PendingDXRGI {
+		bool dirty = false;
+		int width = 0;
+		int height = 0;
+		float max_distance = 64.0f;
+		float energy = 1.0f;
+		int bounce_count = 1;
+	} pending_dxr_gi;
 
 	// --- Deferred post-process state ---
 	struct PendingPostProcess {
@@ -106,7 +121,9 @@ private:
 	// --- Track whether ZeGFX passes replaced Godot's this frame ---
 	bool ao_pass_succeeded = false;
 	bool dxr_reflections_succeeded = false;
+	bool dxr_gi_succeeded = false;
 	bool active_cmd_list_attached = false;
+	void *active_cmd_list = nullptr;
 
 public:
 	static ZeGFXD3D12Bridge *get_singleton() { return singleton; }
@@ -120,6 +137,14 @@ public:
 
 	bool is_initialized() const { return initialized; }
 
+	// Active native command list & queue tracking
+	void set_active_command_list(void *p_cmd_list);
+	void *get_active_command_list() const { return active_cmd_list; }
+	bool has_active_command_list() const { return active_cmd_list != nullptr; }
+	void set_main_command_queue(void *p_queue) { main_direct_queue = p_queue; }
+	void *get_main_command_queue() const { return main_direct_queue; }
+	GPUCommandQueueD3D12 *get_gpu_command_queue() const { return gpu_command_queue; }
+
 	// Register and query cooked .zmesh assets
 	void register_zmesh_metadata(const String &p_path, uint32_t p_meshlet_count, uint32_t p_lod_count, uint32_t p_primitive_count, uint32_t p_vertex_stride);
 	bool is_zmesh_registered(const String &p_path) const;
@@ -129,11 +154,18 @@ public:
 	void update_culling_view(const Transform3D &p_cam_transform, const Projection &p_cam_projection, const Vector3 &p_cam_pos);
 	zegfx::VirtualGeometryManager *get_virtual_geometry_manager() const { return virtual_geom_manager; }
 	zegfx::ZCullingContext *get_culling_context() const { return culling_context; }
+	zegfx::ZGPUScene *get_gpu_scene() const { return gpu_scene; }
+
+	// Register scene instance transforms and bounds for GPU-driven culling
+	void register_scene_instance(const Transform3D &p_transform, const AABB &p_aabb, uint32_t p_material_id = 0);
+	void clear_scene_instances();
 
 	// Query whether ZeGFX passes should replace Godot's equivalents this frame
-	bool ao_pass_active() const { return initialized && active_cmd_list_attached; }
-	bool dxr_reflections_active() const;
+	bool ao_pass_active() const { return initialized && ao_pass_succeeded && active_cmd_list_attached; }
+	bool dxr_reflections_active() const { return initialized && dxr_reflections_succeeded && active_cmd_list_attached; }
 	bool has_dxr_reflections_succeeded() const { return dxr_reflections_succeeded; }
+	bool dxr_gi_active() const { return initialized && dxr_gi_succeeded && active_cmd_list_attached; }
+	bool has_dxr_gi_succeeded() const { return dxr_gi_succeeded; }
 	bool post_composite_active() const { return initialized && post_composite != nullptr; }
 
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
@@ -144,6 +176,7 @@ public:
 
 	// Phase 3 Subsystem Swap: godotSSR -> zegfxDXR
 	bool execute_dxr_reflections_pass(int p_width, int p_height, float p_roughness_threshold);
+	bool execute_dxr_gi_pass(int p_width, int p_height, float p_max_distance, float p_energy, int p_bounce_count);
 
 	// Phase 4 Subsystem Swap: godotPost -> zegfxPost (Bloom + Auto-Exposure + ACES Tonemap + Sharpening)
 	bool execute_post_process_pass(int p_width, int p_height, float p_exposure, float p_bloom_intensity, int p_tonemap_mode, float p_sharpen, float p_vignette);
@@ -151,6 +184,7 @@ public:
 	// Phase 5 Subsystem Swap: Cooked .zmesh V2 Meshlets & Dynamic LOD Streamer
 	bool execute_meshlet_streamer_pass(const String &p_zmesh_path, uint32_t p_lod_level, uint32_t p_instance_count);
 	bool cook_and_load_zmesh(const String &p_source_file, const String &p_output_zmesh);
+	bool cook_and_load_ztex(const String &p_source_file, const String &p_output_ztex);
 
 	// Called when a D3D12 command list is available to flush all deferred render graph passes.
 	// p_cmd_list: ID3D12GraphicsCommandList* (passed as void* to avoid D3D12 header dependency here).

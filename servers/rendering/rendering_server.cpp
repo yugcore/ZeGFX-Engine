@@ -3092,6 +3092,9 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("environment_set_tonemap_agx_contrast", "env", "agx_contrast"), &RenderingServer::environment_set_tonemap_agx_contrast);
 	ClassDB::bind_method(D_METHOD("environment_set_adjustment", "env", "enable", "brightness", "contrast", "saturation", "use_1d_color_correction", "color_correction"), &RenderingServer::environment_set_adjustment);
 	ClassDB::bind_method(D_METHOD("environment_set_ssr", "env", "enable", "max_steps", "fade_in", "fade_out", "depth_tolerance"), &RenderingServer::environment_set_ssr);
+	ClassDB::bind_method(D_METHOD("environment_set_dxr_reflections", "env", "enable", "roughness_threshold"), &RenderingServer::environment_set_dxr_reflections);
+	ClassDB::bind_method(D_METHOD("environment_set_dxr_ao", "env", "enable", "radius", "intensity"), &RenderingServer::environment_set_dxr_ao);
+	ClassDB::bind_method(D_METHOD("environment_set_dxr_gi", "env", "enable", "max_distance", "energy", "bounce_count"), &RenderingServer::environment_set_dxr_gi);
 	ClassDB::bind_method(D_METHOD("environment_set_ssao", "env", "enable", "radius", "intensity", "power", "detail", "horizon", "sharpness", "light_affect", "ao_channel_affect"), &RenderingServer::environment_set_ssao);
 	ClassDB::bind_method(D_METHOD("environment_set_fog", "env", "enable", "light_color", "light_energy", "sun_scatter", "density", "height", "height_density", "aerial_perspective", "sky_affect", "fog_mode"), &RenderingServer::environment_set_fog, DEFVAL(RSE::ENV_FOG_MODE_EXPONENTIAL));
 	ClassDB::bind_method(D_METHOD("environment_set_fog_depth", "env", "curve", "begin", "end"), &RenderingServer::environment_set_fog_depth);
@@ -3800,6 +3803,25 @@ void RenderingServer::init() {
 	GLOBAL_DEF("rendering/environment/glow/upscale_mode.mobile", 0);
 
 	GLOBAL_DEF("rendering/environment/screen_space_reflection/half_size", true);
+
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+	GLOBAL_DEF("rendering/d3d12/raytracing/enabled", true);
+	GLOBAL_DEF("rendering/d3d12/raytracing/reflections_enabled", true);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/reflection_roughness_threshold", PROPERTY_HINT_RANGE, "0.0,1.0,0.01"), 0.5);
+	GLOBAL_DEF("rendering/d3d12/raytracing/fallback_to_ssr", true);
+	GLOBAL_DEF("rendering/d3d12/raytracing/ao_enabled", true);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/ao_radius", PROPERTY_HINT_RANGE, "0.1,16.0,0.01"), 1.5);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/ao_intensity", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), 1.0);
+	GLOBAL_DEF("rendering/d3d12/raytracing/fallback_to_ssao", true);
+	GLOBAL_DEF("rendering/d3d12/raytracing/gi_enabled", true);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/gi_max_distance", PROPERTY_HINT_RANGE, "1.0,512.0,1.0"), 64.0);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/gi_energy", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), 1.0);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/d3d12/raytracing/gi_bounce_count", PROPERTY_HINT_RANGE, "1,4,1"), 1);
+	GLOBAL_DEF("rendering/d3d12/raytracing/fallback_to_sdfgi", true);
+	GLOBAL_DEF("rendering/d3d12/async_compute/enabled", true);
+	GLOBAL_DEF("rendering/d3d12/async_compute/culling", true);
+	GLOBAL_DEF("rendering/d3d12/async_compute/volumetrics", true);
+#endif
 
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/environment/subsurface_scattering/subsurface_scattering_quality", PROPERTY_HINT_ENUM, "Disabled (Fastest),Low (Fast),Medium (Average),High (Slow)"), 1);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/environment/subsurface_scattering/subsurface_scattering_scale", PROPERTY_HINT_RANGE, "0.001,1,0.001"), 0.05);

@@ -258,6 +258,7 @@ public:
 	// SSR
 
 	virtual void environment_set_ssr(RID p_env, bool p_enable, int p_max_steps, float p_fade_int, float p_fade_out, float p_depth_tolerance) = 0;
+	virtual void environment_set_dxr_reflections(RID p_env, bool p_enable, float p_roughness_threshold) = 0;
 
 	virtual bool environment_get_ssr_enabled(RID p_env) const = 0;
 	virtual int environment_get_ssr_max_steps(RID p_env) const = 0;
@@ -270,6 +271,7 @@ public:
 
 	// SSAO
 	virtual void environment_set_ssao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, float p_detail, float p_horizon, float p_sharpness, float p_light_affect, float p_ao_channel_affect) = 0;
+	virtual void environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity) = 0;
 
 	virtual bool environment_get_ssao_enabled(RID p_env) const = 0;
 	virtual float environment_get_ssao_radius(RID p_env) const = 0;
@@ -297,6 +299,7 @@ public:
 
 	// SDFGI
 	virtual void environment_set_sdfgi(RID p_env, bool p_enable, int p_cascades, float p_min_cell_size, RSE::EnvironmentSDFGIYScale p_y_scale, bool p_use_occlusion, float p_bounce_feedback, bool p_read_sky, float p_energy, float p_normal_bias, float p_probe_bias) = 0;
+	virtual void environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count) = 0;
 
 	virtual bool environment_get_sdfgi_enabled(RID p_env) const = 0;
 	virtual int environment_get_sdfgi_cascades(RID p_env) const = 0;

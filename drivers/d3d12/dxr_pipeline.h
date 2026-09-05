@@ -21,6 +21,14 @@ struct DXRReflectionConstants {
     uint32_t height = 0;
 };
 
+struct DXRGIConstants {
+    float max_distance = 64.0f;
+    float energy = 1.0f;
+    uint32_t bounce_count = 1;
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
 class DXRPipelineD3D12 {
 public:
     DXRPipelineD3D12();
@@ -48,6 +56,18 @@ public:
         int p_width,
         int p_height,
         float p_roughness_threshold
+    );
+
+    void dispatch_gi_rays(
+        ID3D12GraphicsCommandList* p_cmd_list,
+        ID3D12Resource* p_hdr_target,
+        ID3D12Resource* p_depth_target,
+        ID3D12Resource* p_normal_target,
+        int p_width,
+        int p_height,
+        float p_max_distance,
+        float p_energy,
+        int p_bounce_count
     );
 
 private:

@@ -2522,8 +2522,15 @@ RDD::CommandQueueID RenderingDeviceDriverD3D12::command_queue_create(CommandQueu
 	HRESULT res = device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(d3d_queue.GetAddressOf()));
 	ERR_FAIL_COND_V(!SUCCEEDED(res), CommandQueueID());
 
-	if (p_identify_as_main_queue && D3D12Hooks::get_singleton() != nullptr) {
-		D3D12Hooks::get_singleton()->set_command_queue(d3d_queue.Get());
+	if (p_identify_as_main_queue) {
+		if (D3D12Hooks::get_singleton() != nullptr) {
+			D3D12Hooks::get_singleton()->set_command_queue(d3d_queue.Get());
+		}
+#ifdef WITH_DX12_BACKEND
+		if (ZeGFXD3D12Bridge::get_singleton() != nullptr) {
+			ZeGFXD3D12Bridge::get_singleton()->set_main_command_queue(d3d_queue.Get());
+		}
+#endif
 	}
 
 	CommandQueueInfo *command_queue = memnew(CommandQueueInfo);
@@ -2692,6 +2699,11 @@ bool RenderingDeviceDriverD3D12::command_buffer_begin(CommandBufferID p_cmd_buff
 	ERR_FAIL_COND_V_MSG(!SUCCEEDED(res), false, "Reset failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");
 	res = cmd_buf_info->cmd_list->Reset(cmd_buf_info->cmd_allocator.Get(), nullptr);
 	ERR_FAIL_COND_V_MSG(!SUCCEEDED(res), false, "Reset failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");
+
+	if (ZeGFXD3D12Bridge::get_singleton()) {
+		ZeGFXD3D12Bridge::get_singleton()->set_active_command_list((void *)cmd_buf_info->cmd_list.Get());
+	}
+
 	return true;
 }
 
@@ -2706,6 +2718,13 @@ bool RenderingDeviceDriverD3D12::command_buffer_begin_secondary(CommandBufferID 
 
 void RenderingDeviceDriverD3D12::command_buffer_end(CommandBufferID p_cmd_buffer) {
 	CommandBufferInfo *cmd_buf_info = (CommandBufferInfo *)p_cmd_buffer.id;
+
+	if (ZeGFXD3D12Bridge::get_singleton()) {
+		if (ZeGFXD3D12Bridge::get_singleton()->get_active_command_list() == (void *)cmd_buf_info->cmd_list.Get()) {
+			ZeGFXD3D12Bridge::get_singleton()->set_active_command_list(nullptr);
+		}
+	}
+
 	HRESULT res = cmd_buf_info->cmd_list->Close();
 
 	ERR_FAIL_COND_MSG(!SUCCEEDED(res), "Close failed with error " + vformat("0x%08ux", (uint64_t)res) + ".");

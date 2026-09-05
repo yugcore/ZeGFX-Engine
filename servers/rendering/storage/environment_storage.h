@@ -142,6 +142,17 @@ private:
 		float ssr_fade_out = 2.0;
 		float ssr_depth_tolerance = 0.5;
 
+		// DXR Ray Tracing
+		bool dxr_reflections_enabled = true;
+		float dxr_reflection_roughness = 0.5f;
+		bool dxr_ao_enabled = true;
+		float dxr_ao_radius = 1.5f;
+		float dxr_ao_intensity = 1.0f;
+		bool dxr_gi_enabled = true;
+		float dxr_gi_max_distance = 64.0f;
+		float dxr_gi_energy = 1.0f;
+		int dxr_gi_bounce_count = 1;
+
 		// SSAO
 		bool ssao_enabled = false;
 		float ssao_radius = 1.0;
@@ -290,6 +301,20 @@ public:
 	float environment_get_ssr_fade_in(RID p_env) const;
 	float environment_get_ssr_fade_out(RID p_env) const;
 	float environment_get_ssr_depth_tolerance(RID p_env) const;
+
+	// DXR
+	void environment_set_dxr_reflections(RID p_env, bool p_enable, float p_roughness_threshold);
+	bool environment_get_dxr_reflections_enabled(RID p_env) const;
+	float environment_get_dxr_reflection_roughness(RID p_env) const;
+	void environment_set_dxr_ao(RID p_env, bool p_enable, float p_radius, float p_intensity);
+	bool environment_get_dxr_ao_enabled(RID p_env) const;
+	float environment_get_dxr_ao_radius(RID p_env) const;
+	float environment_get_dxr_ao_intensity(RID p_env) const;
+	void environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count);
+	bool environment_get_dxr_gi_enabled(RID p_env) const;
+	float environment_get_dxr_gi_max_distance(RID p_env) const;
+	float environment_get_dxr_gi_energy(RID p_env) const;
+	int environment_get_dxr_gi_bounce_count(RID p_env) const;
 
 	// SSAO
 	void environment_set_ssao(RID p_env, bool p_enable, float p_radius, float p_intensity, float p_power, float p_detail, float p_horizon, float p_sharpness, float p_light_affect, float p_ao_channel_affect);

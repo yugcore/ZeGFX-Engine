@@ -1,7 +1,9 @@
 #include "zegfx_d3d12_bridge.h"
 
 #include "core/variant/variant.h"
+#include "core/config/project_settings.h"
 #include "drivers/d3d12/dxr_pipeline.h"
+#include "drivers/d3d12/gpu_command_queue.h"
 #include "drivers/d3d12/post_composite.h"
 #include "drivers/d3d12/volumetrics_pass.h"
 #include "final_image_settings.h"
@@ -10,7 +12,10 @@
 #include "virtual_geometry.h"
 #include "zmesh_submission.h"
 #include "zpost_process.h"
+#include "zgpu_scene.h"
 #include "cooker/asset_cooker.h"
+#include "core/io/file_access.h"
+#include "drivers/d3d12/resource_format_loader_zmesh.h"
 
 #include <algorithm>
 #include <cmath>
@@ -43,6 +48,9 @@ bool ZeGFXD3D12Bridge::initialize(void *p_device_or_hwnd, String &r_error) {
 	// We cannot distinguish the two void* at this level, so we do NOT
 	// perform any COM operations here. The DXR pipeline and PostComposite are
 	// initialized separately via initialize_device().
+
+	// Register .zmesh, .zmat, and .ztex loaders with Godot's ResourceLoader
+	ResourceFormatLoaderZMesh::register_zmesh_loaders();
 
 	initialized = true;
 	print_line("[ZeGFX] D3D12 Bridge initialized (Phase 1-5 subsystem routing active).");
@@ -83,12 +91,30 @@ bool ZeGFXD3D12Bridge::initialize_device(void *p_d3d12_device) {
 	volumetrics_pass = new VolumetricsPassD3D12();
 	volumetrics_pass->initialize(static_cast<ID3D12Device *>(p_d3d12_device));
 
+	gpu_scene = new zegfx::ZGPUScene();
+	gpu_scene->Initialize(static_cast<ID3D12Device *>(p_d3d12_device), 65536);
+
+	gpu_command_queue = new GPUCommandQueueD3D12();
+	gpu_command_queue->initialize(static_cast<ID3D12Device *>(p_d3d12_device));
+
 	device_initialized = true;
-	print_line("[ZeGFX] D3D12 Device subsystems initialized (DXR pipeline + PostComposite + Volumetrics + RenderGraph + PostScheduler + VirtualGeometry/Cull + Meshlet Submission active).");
+	print_line("[ZeGFX] D3D12 Device subsystems initialized (DXR pipeline + PostComposite + Volumetrics + RenderGraph + PostScheduler + VirtualGeometry/Cull + Meshlet Submission + ZGPUScene + AsyncCompute active).");
 	return true;
 }
 
 void ZeGFXD3D12Bridge::shutdown() {
+	if (gpu_command_queue) {
+		gpu_command_queue->shutdown();
+		delete gpu_command_queue;
+		gpu_command_queue = nullptr;
+	}
+	main_direct_queue = nullptr;
+
+	if (gpu_scene) {
+		gpu_scene->Shutdown();
+		delete gpu_scene;
+		gpu_scene = nullptr;
+	}
 	if (volumetrics_pass) {
 		volumetrics_pass->shutdown();
 		delete volumetrics_pass;
@@ -126,13 +152,20 @@ void ZeGFXD3D12Bridge::shutdown() {
 		dxr_pipeline = nullptr;
 	}
 
+	ResourceFormatLoaderZMesh::unregister_zmesh_loaders();
+
 	pending_meshlet_streams.clear();
+	active_cmd_list = nullptr;
+	active_cmd_list_attached = false;
+	ao_pass_succeeded = false;
+	dxr_reflections_succeeded = false;
 	device_initialized = false;
 	initialized = false;
 }
 
-bool ZeGFXD3D12Bridge::dxr_reflections_active() const {
-	return initialized && dxr_pipeline && dxr_pipeline->is_pipeline_ready();
+void ZeGFXD3D12Bridge::set_active_command_list(void *p_cmd_list) {
+	active_cmd_list = p_cmd_list;
+	active_cmd_list_attached = (p_cmd_list != nullptr);
 }
 
 // --- Phase 1: Shadow pass — computes ZeGFX Log-Linear PSSM splits & contact hardening distribution ---
@@ -197,6 +230,25 @@ bool ZeGFXD3D12Bridge::execute_dxr_reflections_pass(int p_width, int p_height, f
 	pending_dxr_reflections.width = p_width;
 	pending_dxr_reflections.height = p_height;
 	pending_dxr_reflections.roughness = p_roughness_threshold;
+
+	return true;
+}
+
+bool ZeGFXD3D12Bridge::execute_dxr_gi_pass(int p_width, int p_height, float p_max_distance, float p_energy, int p_bounce_count) {
+	if (!initialized) {
+		return false;
+	}
+
+	if (!dxr_pipeline || !dxr_pipeline->is_dxr_supported()) {
+		return false;
+	}
+
+	pending_dxr_gi.dirty = true;
+	pending_dxr_gi.width = p_width;
+	pending_dxr_gi.height = p_height;
+	pending_dxr_gi.max_distance = p_max_distance;
+	pending_dxr_gi.energy = p_energy;
+	pending_dxr_gi.bounce_count = p_bounce_count;
 
 	return true;
 }
@@ -294,6 +346,10 @@ bool ZeGFXD3D12Bridge::cook_and_load_zmesh(const String &p_source_file, const St
 		return false;
 	}
 
+	if (FileAccess::exists(p_output_zmesh)) {
+		return true;
+	}
+
 	zegfx::cooker::AssetCooker cooker;
 	std::string src = p_source_file.utf8().get_data();
 	std::string dst = p_output_zmesh.utf8().get_data();
@@ -309,41 +365,129 @@ bool ZeGFXD3D12Bridge::cook_and_load_zmesh(const String &p_source_file, const St
 	return true;
 }
 
+bool ZeGFXD3D12Bridge::cook_and_load_ztex(const String &p_source_file, const String &p_output_ztex) {
+	if (!initialized) {
+		return false;
+	}
+
+	if (FileAccess::exists(p_output_ztex)) {
+		return true;
+	}
+
+	zegfx::cooker::AssetCooker cooker;
+	std::string src = p_source_file.utf8().get_data();
+	std::string dst = p_output_ztex.utf8().get_data();
+
+	auto result = cooker.CookTexture(src, dst);
+	if (!result) {
+		print_line(vformat("[ZeGFX] AssetCooker::CookTexture FAILED: %s -> %s (%s)",
+				p_source_file, p_output_ztex, String(result.errorMessage.c_str())));
+		return false;
+	}
+
+	print_line(vformat("[ZeGFX Texture Pipeline] Successfully baked '%s' -> '%s' (.ztex BC compressed).", p_source_file, p_output_ztex));
+	return true;
+}
+
+void ZeGFXD3D12Bridge::register_scene_instance(const Transform3D &p_transform, const AABB &p_aabb, uint32_t p_material_id) {
+	if (!gpu_scene || !gpu_scene->IsInitialized()) {
+		return;
+	}
+
+	zegfx::ZInstanceData inst = {};
+	// 4x3 row-major matrix:
+	inst.WorldTransform[0] = p_transform.basis.rows[0].x;
+	inst.WorldTransform[1] = p_transform.basis.rows[0].y;
+	inst.WorldTransform[2] = p_transform.basis.rows[0].z;
+	inst.WorldTransform[3] = p_transform.origin.x;
+
+	inst.WorldTransform[4] = p_transform.basis.rows[1].x;
+	inst.WorldTransform[5] = p_transform.basis.rows[1].y;
+	inst.WorldTransform[6] = p_transform.basis.rows[1].z;
+	inst.WorldTransform[7] = p_transform.origin.y;
+
+	inst.WorldTransform[8] = p_transform.basis.rows[2].x;
+	inst.WorldTransform[9] = p_transform.basis.rows[2].y;
+	inst.WorldTransform[10] = p_transform.basis.rows[2].z;
+	inst.WorldTransform[11] = p_transform.origin.z;
+
+	zegfx::ZPrimitiveData prim = {};
+	Vector3 center = p_aabb.get_center();
+	prim.Center[0] = center.x;
+	prim.Center[1] = center.y;
+	prim.Center[2] = center.z;
+	prim.Radius = p_aabb.get_longest_axis_size() * 0.5f;
+	prim.MaterialID = p_material_id;
+	prim.Flags = 1;
+
+	gpu_scene->RegisterInstance(inst, prim);
+}
+
+void ZeGFXD3D12Bridge::clear_scene_instances() {
+	// Instances update every frame with scene traversal
+}
+
 // --- Deferred render graph flush: builds, compiles, and executes all queued passes ---
 void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_target, void *p_depth_target,
 		void *p_normal_target, void *p_output_target,
 		int p_width, int p_height, float p_delta_time) {
-	active_cmd_list_attached = (p_cmd_list != nullptr);
+	void *effective_cmd_list = p_cmd_list ? p_cmd_list : active_cmd_list;
+	active_cmd_list_attached = (effective_cmd_list != nullptr);
 
 	if (!device_initialized || !frame_render_graph) {
 		// Reset dirty flags even if we can't execute
 		pending_ao.dirty = false;
 		pending_dxr_reflections.dirty = false;
+		pending_dxr_gi.dirty = false;
 		pending_post_process.dirty = false;
 		ao_pass_succeeded = false;
 		dxr_reflections_succeeded = false;
+		dxr_gi_succeeded = false;
 		pending_meshlet_streams.clear();
 		return;
 	}
 
 	ao_pass_succeeded = false;
 	dxr_reflections_succeeded = false;
+	dxr_gi_succeeded = false;
 
 	// Clear the render graph for this frame
 	frame_render_graph->clear();
 
 	// Phase 2: Execute GPU Hi-Z Downsampling and Two-Phase Cluster Occlusion Culling
-	if (virtual_geom_manager && p_cmd_list && p_depth_target) {
+	if (virtual_geom_manager && effective_cmd_list && p_depth_target) {
 		virtual_geom_manager->BuildHZB(
-				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
 				static_cast<ID3D12Resource *>(p_depth_target));
 		virtual_geom_manager->DispatchCull(
-				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list));
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list));
+	}
+
+	bool async_compute_enabled = GLOBAL_GET("rendering/d3d12/async_compute/enabled");
+	bool async_cull_enabled = async_compute_enabled && (bool)GLOBAL_GET("rendering/d3d12/async_compute/culling");
+	bool async_vol_enabled = async_compute_enabled && (bool)GLOBAL_GET("rendering/d3d12/async_compute/volumetrics");
+
+	ID3D12GraphicsCommandList *async_cmd = nullptr;
+	if (async_compute_enabled && gpu_command_queue && gpu_command_queue->has_async_compute()) {
+		async_cmd = gpu_command_queue->begin_async_compute();
+	}
+
+	// GPU-driven bindless scene culling
+	if (gpu_scene && culling_context && gpu_scene->GetInstanceCount() > 0) {
+		ID3D12GraphicsCommandList *cmd = (async_cull_enabled && async_cmd) ? async_cmd : static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list);
+		if (cmd) {
+			gpu_scene->FlushUpdates(cmd);
+			zegfx::ZViewInfo view_info = {};
+			view_info.CameraPosition.x = culling_view.cam_position.x;
+			view_info.CameraPosition.y = culling_view.cam_position.y;
+			view_info.CameraPosition.z = culling_view.cam_position.z;
+			culling_context->DispatchCulling(cmd, view_info, gpu_scene);
+		}
 	}
 
 	// Phase 5: Execute GPU-driven indirect draw dispatch for queued .zmesh streams
-	if (submission_context && culling_context && p_cmd_list && !pending_meshlet_streams.is_empty()) {
-		ID3D12GraphicsCommandList *cmd = static_cast<ID3D12GraphicsCommandList *>(p_cmd_list);
+	if (submission_context && culling_context && effective_cmd_list && !pending_meshlet_streams.is_empty()) {
+		ID3D12GraphicsCommandList *cmd = static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list);
 		ID3D12Resource *cull_buf = culling_context->GetCullBuffer();
 		ID3D12Resource *vis_buf = culling_context->GetVisibleBuffer();
 		if (cull_buf && vis_buf) {
@@ -352,11 +496,13 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	}
 
 	bool has_work = pending_ao.dirty || pending_dxr_reflections.dirty ||
-			pending_post_process.dirty || pending_meshlet_streams.size() > 0;
+			pending_dxr_gi.dirty || pending_post_process.dirty ||
+			pending_meshlet_streams.size() > 0;
 
 	if (!has_work) {
 		ao_pass_succeeded = false;
 		dxr_reflections_succeeded = false;
+		dxr_gi_succeeded = false;
 		return;
 	}
 
@@ -411,32 +557,68 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 			ao_settings.intensity = pending_ao.intensity;
 			post_composite->update_ao_settings(ao_settings);
 		}
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+		ao_pass_succeeded = true;
+#else
+		ao_pass_succeeded = false;
+#endif
+	} else {
+		ao_pass_succeeded = false;
 	}
 
 	// Execute DXR ray-traced reflections when scheduled and hardware pipeline is fully ready
-	if (pending_dxr_reflections.dirty && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && p_cmd_list) {
+	if (pending_dxr_reflections.dirty && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && effective_cmd_list) {
 		dxr_pipeline->dispatch_reflection_rays(
-				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
 				static_cast<ID3D12Resource *>(p_hdr_target),
 				static_cast<ID3D12Resource *>(p_depth_target),
 				static_cast<ID3D12Resource *>(p_normal_target),
 				p_width, p_height, pending_dxr_reflections.roughness);
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
 		dxr_reflections_succeeded = true;
+#else
+		dxr_reflections_succeeded = false;
+#endif
 	} else {
 		dxr_reflections_succeeded = false;
 	}
 
+	// Execute DXR ray-traced GI when scheduled and hardware pipeline is fully ready
+	if (pending_dxr_gi.dirty && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && effective_cmd_list) {
+		dxr_pipeline->dispatch_gi_rays(
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
+				static_cast<ID3D12Resource *>(p_hdr_target),
+				static_cast<ID3D12Resource *>(p_depth_target),
+				static_cast<ID3D12Resource *>(p_normal_target),
+				p_width, p_height, pending_dxr_gi.max_distance, pending_dxr_gi.energy, pending_dxr_gi.bounce_count);
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+		dxr_gi_succeeded = true;
+#else
+		dxr_gi_succeeded = false;
+#endif
+	} else {
+		dxr_gi_succeeded = false;
+	}
+
 	// Execute 3D Froxel Volumetric Fog integration
-	if (volumetrics_pass && volumetrics_pass->is_initialized() && p_cmd_list) {
-		volumetrics_pass->dispatch_volumetric_fog(
-				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
-				nullptr, nullptr, static_cast<uint32_t>(p_width), static_cast<uint32_t>(p_height));
+	if (volumetrics_pass && volumetrics_pass->is_initialized()) {
+		ID3D12GraphicsCommandList *vol_cmd = (async_vol_enabled && async_cmd) ? async_cmd : static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list);
+		if (vol_cmd) {
+			volumetrics_pass->dispatch_volumetric_fog(
+					vol_cmd,
+					nullptr, nullptr, static_cast<uint32_t>(p_width), static_cast<uint32_t>(p_height));
+		}
+	}
+
+	// If async compute was recorded, submit to compute queue and sync direct queue
+	if (async_cmd) {
+		gpu_command_queue->end_and_execute_async_compute(static_cast<ID3D12CommandQueue *>(main_direct_queue));
 	}
 
 	// Execute the post-processing chain with the targets (when available)
-	if (pending_post_process.dirty && post_composite && post_composite->is_initialized() && p_hdr_target) {
+	if (pending_post_process.dirty && post_composite && post_composite->is_initialized() && effective_cmd_list) {
 		post_composite->execute_post_processing_chain(
-				static_cast<ID3D12GraphicsCommandList *>(p_cmd_list),
+				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
 				static_cast<ID3D12Resource *>(p_hdr_target),
 				static_cast<ID3D12Resource *>(p_depth_target),
 				static_cast<ID3D12Resource *>(p_normal_target),
@@ -449,17 +631,18 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	// Compile and execute the render graph if passes were scheduled
 	if (frame_render_graph->getPassCount() > 0) {
 		frame_render_graph->compile();
-		frame_render_graph->execute(p_cmd_list);
+		frame_render_graph->execute(effective_cmd_list);
 	}
 
 	// Clear deferred state for next frame
 	pending_ao.dirty = false;
 	pending_dxr_reflections.dirty = false;
+	pending_dxr_gi.dirty = false;
 	pending_post_process.dirty = false;
 	pending_meshlet_streams.clear();
 
 	// Reset per-frame replacement flags (they'll be set again next frame by execute_*_pass calls)
-	// Note: we do NOT reset ao_pass_succeeded / dxr_reflections_succeeded here because
+	// Note: we do NOT reset ao_pass_succeeded / dxr_reflections_succeeded / dxr_gi_succeeded here because
 	// the Godot callsites that check them run AFTER execute_*_pass but BEFORE flush_deferred_passes.
 	// They will be reset at the start of the next frame's flush.
 }

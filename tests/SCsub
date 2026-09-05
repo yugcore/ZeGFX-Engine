@@ -7,6 +7,10 @@ import test_builders
 
 Import("env")
 
+if env["d3d12"]:
+    env.Append(CPPPATH=["#drivers/d3d12", "#ZeGFX/include", "#ZeGFX/src"])
+    env.Append(CPPDEFINES=["WITH_DX12_BACKEND"])
+
 # Sources with tests must be explicitly linked first.
 force_link_sources = glob.glob("*/**/*.cpp", recursive=True)
 force_link_header = env.CommandNoCache(

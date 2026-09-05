@@ -33,12 +33,28 @@ public:
         uint64_t p_count_buffer_offset = 0
     );
 
+    // Asynchronous compute queue management
+    bool has_async_compute() const { return async_compute_supported; }
+    ID3D12CommandQueue* get_compute_queue() const { return compute_queue; }
+    ID3D12GraphicsCommandList* begin_async_compute();
+    void end_and_execute_async_compute(ID3D12CommandQueue* p_direct_queue = nullptr);
+    void sync_direct_queue_with_compute(ID3D12CommandQueue* p_direct_queue);
+
     bool is_initialized() const { return initialized; }
 
 private:
     bool initialized = false;
     ID3D12Device* device = nullptr;
     ID3D12CommandSignature* draw_indexed_signature = nullptr;
+
+    // Async compute queue objects
+    ID3D12CommandQueue* compute_queue = nullptr;
+    ID3D12CommandAllocator* compute_allocator = nullptr;
+    ID3D12GraphicsCommandList* compute_cmd_list = nullptr;
+    ID3D12Fence* compute_fence = nullptr;
+    uint64_t compute_fence_value = 0;
+    bool async_compute_supported = false;
+    bool compute_recording = false;
 };
 
 #endif // WITH_DX12_BACKEND

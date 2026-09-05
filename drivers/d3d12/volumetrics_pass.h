@@ -41,6 +41,7 @@ private:
     bool initialized = false;
     ID3D12Device* device = nullptr;
     zegfx::VolumetricFogSystem* fog_system = nullptr;
+    ID3D12Resource* default_light_buffer = nullptr;
 };
 
 #endif // WITH_DX12_BACKEND

@@ -237,7 +237,7 @@ void PostCompositeD3D12::execute_post_processing_chain(
 		uint32_t p_width,
 		uint32_t p_height,
 		float p_delta_time) {
-	if (!initialized || !p_hdr_scene_color || !p_cmd_list) return;
+	if (!initialized || !p_cmd_list) return;
 
 	// Step 1: AO — apply Ground-Truth Ambient Occlusion if enabled
 	if (ao_system && ao_system->isEnabled()) {
@@ -252,9 +252,23 @@ void PostCompositeD3D12::execute_post_processing_chain(
 	}
 
 	// Step 3: Bloom — Dual-Filter bloom pyramid downsample & upsample accumulate
-	if (bloom_system && bloom_system->isEnabled()) {
+	if (bloom_system && bloom_system->isEnabled() && p_hdr_scene_color) {
 		const auto &bloom = bloom_system->getSettings();
-		(void)bloom;
+		if (bloom.intensity > 0.001f) {
+			// Transition HDR color buffer to shader resource for bloom compute reads
+			D3D12_RESOURCE_BARRIER hdr_barrier = {};
+			hdr_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+			hdr_barrier.Transition.pResource = p_hdr_scene_color;
+			hdr_barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			hdr_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			hdr_barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+			p_cmd_list->ResourceBarrier(1, &hdr_barrier);
+
+			// Transition back to render target for subsequent composite passes
+			hdr_barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+			hdr_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+			p_cmd_list->ResourceBarrier(1, &hdr_barrier);
+		}
 	}
 
 	// Step 4: Exposure adaptation — Histogram-based eye adaptation

@@ -1445,10 +1445,26 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 
 #if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
-		Size2i size = p_render_buffers->get_internal_size();
-		float radius = environment_get_ssao_radius(p_environment);
-		float intensity = environment_get_ssao_intensity(p_environment);
-		ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity);
+		bool dxr_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/enabled");
+		bool dxr_ao_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/ao_enabled");
+		float radius = GLOBAL_GET("rendering/d3d12/raytracing/ao_radius");
+		float intensity = GLOBAL_GET("rendering/d3d12/raytracing/ao_intensity");
+
+		bool dxr_ao_allowed = dxr_global_enabled && dxr_ao_global_enabled;
+		if (p_environment.is_valid()) {
+			dxr_ao_allowed = dxr_ao_allowed && environment_get_dxr_ao_enabled(p_environment);
+			radius = environment_get_dxr_ao_radius(p_environment);
+			intensity = environment_get_dxr_ao_intensity(p_environment);
+		}
+
+		if (dxr_ao_allowed) {
+			Size2i size = p_render_buffers->get_internal_size();
+			if (ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity)) {
+				if (ZeGFXD3D12Bridge::get_singleton()->ao_pass_active()) {
+					return;
+				}
+			}
+		}
 	}
 #endif
 
@@ -1514,10 +1530,22 @@ void RenderForwardClustered::_process_ssr(Ref<RenderSceneBuffersRD> p_render_buf
 
 #if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
 	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
-		Size2i size = p_render_buffers->get_internal_size();
-		if (ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, 0.5f)) {
-			if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active()) {
-				return;
+		bool dxr_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/enabled");
+		bool dxr_refl_enabled = GLOBAL_GET("rendering/d3d12/raytracing/reflections_enabled");
+		float roughness_thresh = GLOBAL_GET("rendering/d3d12/raytracing/reflection_roughness_threshold");
+
+		bool dxr_allowed = dxr_global_enabled && dxr_refl_enabled;
+		if (p_environment.is_valid()) {
+			dxr_allowed = dxr_allowed && environment_get_dxr_reflections_enabled(p_environment);
+			roughness_thresh = environment_get_dxr_reflection_roughness(p_environment);
+		}
+
+		if (dxr_allowed) {
+			Size2i size = p_render_buffers->get_internal_size();
+			if (ZeGFXD3D12Bridge::get_singleton()->execute_dxr_reflections_pass(size.x, size.y, roughness_thresh)) {
+				if (ZeGFXD3D12Bridge::get_singleton()->dxr_reflections_active()) {
+					return;
+				}
 			}
 		}
 	}
@@ -1640,7 +1668,39 @@ void RenderForwardClustered::_pre_opaque_render(RenderDataRD *p_render_data, boo
 	}
 
 	if (render_gi) {
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+		bool dxr_gi_dispatched = false;
+		if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+			bool dxr_global_enabled = GLOBAL_GET("rendering/d3d12/raytracing/enabled");
+			bool dxr_gi_enabled = GLOBAL_GET("rendering/d3d12/raytracing/gi_enabled");
+			float max_distance = GLOBAL_GET("rendering/d3d12/raytracing/gi_max_distance");
+			float energy = GLOBAL_GET("rendering/d3d12/raytracing/gi_energy");
+			int bounce_count = GLOBAL_GET("rendering/d3d12/raytracing/gi_bounce_count");
+
+			bool dxr_allowed = dxr_global_enabled && dxr_gi_enabled;
+			if (p_render_data->environment.is_valid()) {
+				dxr_allowed = dxr_allowed && environment_get_dxr_gi_enabled(p_render_data->environment);
+				max_distance = environment_get_dxr_gi_max_distance(p_render_data->environment);
+				energy = environment_get_dxr_gi_energy(p_render_data->environment);
+				bounce_count = environment_get_dxr_gi_bounce_count(p_render_data->environment);
+			}
+
+			if (dxr_allowed) {
+				Size2i size = rb->get_internal_size();
+				if (ZeGFXD3D12Bridge::get_singleton()->execute_dxr_gi_pass(size.x, size.y, max_distance, energy, bounce_count)) {
+					if (ZeGFXD3D12Bridge::get_singleton()->dxr_gi_active()) {
+						dxr_gi_dispatched = true;
+					}
+				}
+			}
+		}
+
+		if (!dxr_gi_dispatched) {
+			gi.process_gi(rb, p_normal_roughness_slices, p_voxel_gi_buffer, p_render_data->environment, p_render_data->scene_data->view_count, p_render_data->scene_data->view_projection, p_render_data->scene_data->view_eye_offset, p_render_data->scene_data->cam_transform, *p_render_data->voxel_gi_instances);
+		}
+#else
 		gi.process_gi(rb, p_normal_roughness_slices, p_voxel_gi_buffer, p_render_data->environment, p_render_data->scene_data->view_count, p_render_data->scene_data->view_projection, p_render_data->scene_data->view_eye_offset, p_render_data->scene_data->cam_transform, *p_render_data->voxel_gi_instances);
+#endif
 	}
 
 	if (render_shadows) {
@@ -2288,6 +2348,12 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 					if (!base_mesh.is_valid() || !RendererRD::MeshStorage::get_singleton()->owns_mesh(base_mesh)) {
 						continue;
 					}
+
+					// Register visible instance into ZeGFX GPU Scene buffer for bindless culling
+					ZeGFXD3D12Bridge::get_singleton()->register_scene_instance(
+							surf->owner->transform,
+							surf->owner->transformed_aabb,
+							(uint32_t)surf->sort.material_id_lo);
 
 					String mesh_path = RendererRD::MeshStorage::get_singleton()->mesh_get_path(base_mesh);
 					if (!mesh_path.is_empty() && (mesh_path.ends_with(".zmesh") || ZeGFXD3D12Bridge::get_singleton()->is_zmesh_registered(mesh_path))) {

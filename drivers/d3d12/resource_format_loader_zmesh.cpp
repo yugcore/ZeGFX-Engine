@@ -794,3 +794,39 @@ String ResourceFormatLoaderZTex::get_resource_type(const String &p_path) const {
 	}
 	return "";
 }
+
+static Ref<ResourceFormatLoaderZMesh> loader_zmesh;
+static Ref<ResourceFormatLoaderZMat> loader_zmat;
+static Ref<ResourceFormatLoaderZTex> loader_ztex;
+
+void ResourceFormatLoaderZMesh::register_zmesh_loaders() {
+	if (loader_zmesh.is_null()) {
+		loader_zmesh.instantiate();
+		ResourceLoader::add_resource_format_loader(loader_zmesh);
+	}
+	if (loader_zmat.is_null()) {
+		loader_zmat.instantiate();
+		ResourceLoader::add_resource_format_loader(loader_zmat);
+	}
+	if (loader_ztex.is_null()) {
+		loader_ztex.instantiate();
+		ResourceLoader::add_resource_format_loader(loader_ztex);
+	}
+	print_line("[ZeGFX] Registered .zmesh, .zmat, and .ztex resource format loaders.");
+}
+
+void ResourceFormatLoaderZMesh::unregister_zmesh_loaders() {
+	if (loader_zmesh.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(loader_zmesh);
+		loader_zmesh.unref();
+	}
+	if (loader_zmat.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(loader_zmat);
+		loader_zmat.unref();
+	}
+	if (loader_ztex.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(loader_ztex);
+		loader_ztex.unref();
+	}
+}
+
