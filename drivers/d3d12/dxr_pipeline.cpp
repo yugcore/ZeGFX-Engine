@@ -688,5 +688,42 @@ void DXRPipelineD3D12::dispatch_ao_rays(
     cmd_list4->Release();
 }
 
+void DXRPipelineD3D12::dispatch_debug_rays(
+    ID3D12GraphicsCommandList* p_cmd_list,
+    ID3D12Resource* p_output_target,
+    int p_width,
+    int p_height,
+    int p_debug_mode
+) {
+    if (!initialized || !dxr_supported || !p_cmd_list || !p_output_target) return;
+
+    ID3D12GraphicsCommandList4* cmd_list4 = nullptr;
+    if (FAILED(p_cmd_list->QueryInterface(IID_PPV_ARGS(&cmd_list4))) || !cmd_list4) {
+        return;
+    }
+
+    if (rtx_state_object && global_root_sig && sbt_buffer) {
+        cmd_list4->SetPipelineState1(rtx_state_object);
+        cmd_list4->SetComputeRootSignature(global_root_sig);
+
+        DXRDebugConstants constants = {};
+        constants.debug_mode = static_cast<uint32_t>(p_debug_mode);
+        constants.width = static_cast<uint32_t>(p_width);
+        constants.height = static_cast<uint32_t>(p_height);
+
+        cmd_list4->SetComputeRoot32BitConstants(0, sizeof(DXRDebugConstants) / 4, &constants, 0);
+
+#if defined(DXR_DESCRIPTOR_TABLES_BOUND)
+        dispatch_desc.Width = static_cast<UINT>(p_width);
+        dispatch_desc.Height = static_cast<UINT>(p_height);
+        dispatch_desc.Depth = 1;
+        cmd_list4->DispatchRays(&dispatch_desc);
+#endif
+    }
+
+    cmd_list4->Release();
+}
+
 #endif // WITH_DX12_BACKEND
+
 

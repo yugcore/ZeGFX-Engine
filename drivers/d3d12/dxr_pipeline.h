@@ -50,6 +50,13 @@ struct DXRAmbientOcclusionConstants {
     float padding[2] = { 0.0f, 0.0f };
 };
 
+struct DXRDebugConstants {
+    uint32_t debug_mode = 0; // 1 = BVH Heatmap, 2 = Ray Cost, 3 = Shadows, 4 = Reflections, 5 = GI, 6 = AO
+    uint32_t width = 0;
+    uint32_t height = 0;
+    float padding = 0.0f;
+};
+
 class DXRPipelineD3D12 {
 public:
     DXRPipelineD3D12();
@@ -117,6 +124,14 @@ public:
         float p_intensity,
         float p_power,
         int p_samples
+    );
+
+    void dispatch_debug_rays(
+        ID3D12GraphicsCommandList* p_cmd_list,
+        ID3D12Resource* p_output_target,
+        int p_width,
+        int p_height,
+        int p_debug_mode
     );
 
 private:

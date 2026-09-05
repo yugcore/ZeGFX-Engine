@@ -186,6 +186,22 @@ public:
 	bool has_dxr_shadows_succeeded() const { return dxr_shadows_succeeded; }
 	bool post_composite_active() const { return initialized && post_composite != nullptr; }
 
+	enum DXRDebugDrawMode {
+		DXR_DEBUG_DISABLED = 0,
+		DXR_DEBUG_BVH_HEATMAP = 1,
+		DXR_DEBUG_RAY_COST = 2,
+		DXR_DEBUG_SHADOWS = 3,
+		DXR_DEBUG_REFLECTIONS = 4,
+		DXR_DEBUG_GI = 5,
+		DXR_DEBUG_AO = 6,
+	};
+
+	DXRDebugDrawMode active_debug_mode = DXR_DEBUG_DISABLED;
+
+	void set_dxr_debug_mode(DXRDebugDrawMode p_mode) { active_debug_mode = p_mode; }
+	DXRDebugDrawMode get_dxr_debug_mode() const { return active_debug_mode; }
+	bool is_dxr_debug_active() const { return active_debug_mode != DXR_DEBUG_DISABLED; }
+
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
 	bool execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits);
 

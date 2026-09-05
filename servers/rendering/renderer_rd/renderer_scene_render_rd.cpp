@@ -1064,6 +1064,12 @@ bool RendererSceneRenderRD::_debug_draw_can_use_effects(RSE::ViewportDebugDraw p
 		case RSE::VIEWPORT_DEBUG_DRAW_CLUSTER_DECALS:
 		case RSE::VIEWPORT_DEBUG_DRAW_CLUSTER_REFLECTION_PROBES:
 		case RSE::VIEWPORT_DEBUG_DRAW_INTERNAL_BUFFER:
+		case RSE::VIEWPORT_DEBUG_DRAW_DXR_BVH_HEATMAP:
+		case RSE::VIEWPORT_DEBUG_DRAW_DXR_RAY_COST:
+		case RSE::VIEWPORT_DEBUG_DRAW_DXR_SHADOWS:
+		case RSE::VIEWPORT_DEBUG_DRAW_DXR_REFLECTIONS:
+		case RSE::VIEWPORT_DEBUG_DRAW_DXR_GI:
+		case RSE::VIEWPORT_DEBUG_DRAW_DXR_AO:
 			can_use_effects = false;
 			break;
 		// Modes that draws information over part of the viewport needs camera effects because we see partially the normal draw mode.
@@ -1202,6 +1208,34 @@ void RendererSceneRenderRD::_render_buffers_debug_draw(const RenderDataRD *p_ren
 
 		debug_effects->draw_motion_vectors(velocity, depth, dest_fb, p_render_data->scene_data->cam_projection, p_render_data->scene_data->cam_transform, p_render_data->scene_data->prev_cam_projection, p_render_data->scene_data->prev_cam_transform, resolution);
 	}
+
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+		switch (debug_draw) {
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_BVH_HEATMAP:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_BVH_HEATMAP);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_RAY_COST:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_RAY_COST);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_SHADOWS:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_SHADOWS);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_REFLECTIONS:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_REFLECTIONS);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_GI:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_GI);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_AO:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_AO);
+				break;
+			default:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_DISABLED);
+				break;
+		}
+	}
+#endif
 }
 
 RID RendererSceneRenderRD::render_buffers_get_default_voxel_gi_buffer() {
@@ -1720,6 +1754,33 @@ bool RendererSceneRenderRD::free(RID p_rid) {
 
 void RendererSceneRenderRD::set_debug_draw_mode(RSE::ViewportDebugDraw p_debug_draw) {
 	debug_draw = p_debug_draw;
+#if defined(D3D12_ENABLED) && defined(WITH_DX12_BACKEND)
+	if (ZeGFXD3D12Bridge::get_singleton() && ZeGFXD3D12Bridge::get_singleton()->is_initialized()) {
+		switch (p_debug_draw) {
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_BVH_HEATMAP:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_BVH_HEATMAP);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_RAY_COST:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_RAY_COST);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_SHADOWS:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_SHADOWS);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_REFLECTIONS:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_REFLECTIONS);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_GI:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_GI);
+				break;
+			case RSE::VIEWPORT_DEBUG_DRAW_DXR_AO:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_AO);
+				break;
+			default:
+				ZeGFXD3D12Bridge::get_singleton()->set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_DISABLED);
+				break;
+		}
+	}
+#endif
 }
 
 void RendererSceneRenderRD::update() {

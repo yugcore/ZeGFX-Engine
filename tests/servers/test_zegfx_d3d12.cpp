@@ -16,6 +16,7 @@ TEST_FORCE_LINK(test_zegfx_d3d12)
 #include "ZeGFX/include/graphics_backend.h"
 #include "ZeGFX/include/cooked_asset_serialization.h"
 #include "scene/resources/environment.h"
+#include "scene/main/viewport.h"
 #endif
 
 namespace TestZeGFXD3D12 {
@@ -110,8 +111,28 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
         // Texture cooker safe error handling
         CHECK_FALSE(bridge.cook_and_load_ztex("", ""));
 
+        // DXR Debug Draw Mode tracking
+        CHECK(bridge.get_dxr_debug_mode() == ZeGFXD3D12Bridge::DXR_DEBUG_DISABLED);
+        CHECK_FALSE(bridge.is_dxr_debug_active());
+        bridge.set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_BVH_HEATMAP);
+        CHECK(bridge.get_dxr_debug_mode() == ZeGFXD3D12Bridge::DXR_DEBUG_BVH_HEATMAP);
+        CHECK(bridge.is_dxr_debug_active());
+        bridge.set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_RAY_COST);
+        CHECK(bridge.get_dxr_debug_mode() == ZeGFXD3D12Bridge::DXR_DEBUG_RAY_COST);
+        bridge.set_dxr_debug_mode(ZeGFXD3D12Bridge::DXR_DEBUG_DISABLED);
+        CHECK_FALSE(bridge.is_dxr_debug_active());
+
         // Flush deferred passes safely with null command list
         bridge.flush_deferred_passes(nullptr, nullptr, nullptr, nullptr, nullptr, 1920, 1080, 0.016f);
+    }
+
+    SUBCASE("Viewport DXR Debug Draw Enum Constants Parity") {
+        CHECK(Viewport::DEBUG_DRAW_DXR_BVH_HEATMAP > Viewport::DEBUG_DRAW_AREA_LIGHT_ATLAS);
+        CHECK(Viewport::DEBUG_DRAW_DXR_RAY_COST > Viewport::DEBUG_DRAW_DXR_BVH_HEATMAP);
+        CHECK(Viewport::DEBUG_DRAW_DXR_SHADOWS > Viewport::DEBUG_DRAW_DXR_RAY_COST);
+        CHECK(Viewport::DEBUG_DRAW_DXR_REFLECTIONS > Viewport::DEBUG_DRAW_DXR_SHADOWS);
+        CHECK(Viewport::DEBUG_DRAW_DXR_GI > Viewport::DEBUG_DRAW_DXR_REFLECTIONS);
+        CHECK(Viewport::DEBUG_DRAW_DXR_AO > Viewport::DEBUG_DRAW_DXR_GI);
     }
 
     SUBCASE("Environment DXR Ray Tracing Controls and Clamping") {

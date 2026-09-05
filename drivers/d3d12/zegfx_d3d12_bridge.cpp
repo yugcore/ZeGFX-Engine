@@ -532,7 +532,7 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 
 	bool has_work = pending_ao.dirty || pending_dxr_reflections.dirty ||
 			pending_dxr_gi.dirty || pending_dxr_shadow.dirty || pending_post_process.dirty ||
-			pending_meshlet_streams.size() > 0;
+			pending_meshlet_streams.size() > 0 || (active_debug_mode != DXR_DEBUG_DISABLED);
 
 	if (!has_work) {
 		ao_pass_succeeded = false;
@@ -702,6 +702,18 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 				static_cast<uint32_t>(p_width),
 				static_cast<uint32_t>(p_height),
 				p_delta_time);
+	}
+
+	// Execute DXR ray-traced Diagnostic / Debug Views when active
+	if (active_debug_mode != DXR_DEBUG_DISABLED && dxr_pipeline && dxr_pipeline->is_pipeline_ready() && effective_cmd_list) {
+		void *target_resource = p_output_target ? p_output_target : p_hdr_target;
+		if (target_resource) {
+			dxr_pipeline->dispatch_debug_rays(
+					static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
+					static_cast<ID3D12Resource *>(target_resource),
+					p_width, p_height,
+					static_cast<int>(active_debug_mode));
+		}
 	}
 
 	// Compile and execute the render graph if passes were scheduled

@@ -5043,7 +5043,13 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 		case VIEW_DISPLAY_DEBUG_CLUSTER_REFLECTION_PROBES:
 		case VIEW_DISPLAY_DEBUG_OCCLUDERS:
 		case VIEW_DISPLAY_MOTION_VECTORS:
-		case VIEW_DISPLAY_INTERNAL_BUFFER: {
+		case VIEW_DISPLAY_INTERNAL_BUFFER:
+		case VIEW_DISPLAY_DEBUG_DXR_BVH_HEATMAP:
+		case VIEW_DISPLAY_DEBUG_DXR_RAY_COST:
+		case VIEW_DISPLAY_DEBUG_DXR_SHADOWS:
+		case VIEW_DISPLAY_DEBUG_DXR_REFLECTIONS:
+		case VIEW_DISPLAY_DEBUG_DXR_GI:
+		case VIEW_DISPLAY_DEBUG_DXR_AO: {
 			static const int display_options[] = {
 				VIEW_DISPLAY_NORMAL,
 				VIEW_DISPLAY_WIREFRAME,
@@ -5074,6 +5080,12 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 				VIEW_DISPLAY_DEBUG_OCCLUDERS,
 				VIEW_DISPLAY_MOTION_VECTORS,
 				VIEW_DISPLAY_INTERNAL_BUFFER,
+				VIEW_DISPLAY_DEBUG_DXR_BVH_HEATMAP,
+				VIEW_DISPLAY_DEBUG_DXR_RAY_COST,
+				VIEW_DISPLAY_DEBUG_DXR_SHADOWS,
+				VIEW_DISPLAY_DEBUG_DXR_REFLECTIONS,
+				VIEW_DISPLAY_DEBUG_DXR_GI,
+				VIEW_DISPLAY_DEBUG_DXR_AO,
 				VIEW_MAX
 			};
 			static const Viewport::DebugDraw debug_draw_modes[] = {
@@ -5106,6 +5118,12 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 				Viewport::DEBUG_DRAW_OCCLUDERS,
 				Viewport::DEBUG_DRAW_MOTION_VECTORS,
 				Viewport::DEBUG_DRAW_INTERNAL_BUFFER,
+				Viewport::DEBUG_DRAW_DXR_BVH_HEATMAP,
+				Viewport::DEBUG_DRAW_DXR_RAY_COST,
+				Viewport::DEBUG_DRAW_DXR_SHADOWS,
+				Viewport::DEBUG_DRAW_DXR_REFLECTIONS,
+				Viewport::DEBUG_DRAW_DXR_GI,
+				Viewport::DEBUG_DRAW_DXR_AO,
 			};
 
 			for (int idx = 0; display_options[idx] != VIEW_MAX; idx++) {
@@ -7295,6 +7313,19 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 			TTRC("Represents motion vectors with colored lines in the direction of motion. Gray dots represent areas with no per-pixel motion."));
 	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Internal Buffer"), VIEW_DISPLAY_INTERNAL_BUFFER, SupportedRenderingMethods::FORWARD_PLUS_MOBILE,
 			TTRC("Shows the scene rendered in linear colorspace before any tonemapping or post-processing."));
+	display_submenu->add_separator();
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("DXR BVH Traversal Heatmap"), VIEW_DISPLAY_DEBUG_DXR_BVH_HEATMAP, SupportedRenderingMethods::FORWARD_PLUS,
+			TTRC("Displays a false-color heatmap showing ray-BVH traversal complexity and node intersection depth."));
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("DXR Ray Cost & Steps"), VIEW_DISPLAY_DEBUG_DXR_RAY_COST, SupportedRenderingMethods::FORWARD_PLUS,
+			TTRC("Visualizes per-pixel ray step count and intersection tests across active hardware acceleration structures."));
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("DXR Shadow Rays (Occlusion)"), VIEW_DISPLAY_DEBUG_DXR_SHADOWS, SupportedRenderingMethods::FORWARD_PLUS,
+			TTRC("Isolates hardware ray-traced directional and spot shadow occlusion values."));
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("DXR Reflections (Radiance)"), VIEW_DISPLAY_DEBUG_DXR_REFLECTIONS, SupportedRenderingMethods::FORWARD_PLUS,
+			TTRC("Isolates hardware ray-traced specular reflection radiance."));
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("DXR Global Illumination (Diffuse GI)"), VIEW_DISPLAY_DEBUG_DXR_GI, SupportedRenderingMethods::FORWARD_PLUS,
+			TTRC("Isolates hardware ray-traced multi-bounce diffuse indirect global illumination."));
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("DXR Ambient Occlusion (RTAO Mask)"), VIEW_DISPLAY_DEBUG_DXR_AO, SupportedRenderingMethods::FORWARD_PLUS,
+			TTRC("Isolates hardware ray-traced cosine-weighted ambient occlusion."));
 	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Display Advanced..."), display_submenu, VIEW_DISPLAY_ADVANCED);
 
 	quality_submenu = memnew(PopupMenu);
