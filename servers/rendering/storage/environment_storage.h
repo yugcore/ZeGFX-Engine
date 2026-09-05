@@ -150,6 +150,11 @@ private:
 		float dxr_ao_intensity = 1.0f;
 		float dxr_ao_power = 1.0f;
 		int dxr_ao_samples = 4;
+		bool dxr_ao_denoise_enabled = true;
+		int dxr_ao_denoise_radius = 2;
+		float dxr_ao_denoise_depth_sigma = 0.05f;
+		float dxr_ao_denoise_normal_sigma = 32.0f;
+		float dxr_ao_denoise_blend_factor = 0.05f;
 		bool dxr_gi_enabled = true;
 		float dxr_gi_max_distance = 64.0f;
 		float dxr_gi_energy = 1.0f;
@@ -318,6 +323,12 @@ public:
 	float environment_get_dxr_ao_intensity(RID p_env) const;
 	float environment_get_dxr_ao_power(RID p_env) const;
 	int environment_get_dxr_ao_samples(RID p_env) const;
+	void environment_set_dxr_ao_denoise(RID p_env, bool p_enable, int p_radius, float p_depth_sigma, float p_normal_sigma, float p_blend_factor);
+	bool environment_get_dxr_ao_denoise_enabled(RID p_env) const;
+	int environment_get_dxr_ao_denoise_radius(RID p_env) const;
+	float environment_get_dxr_ao_denoise_depth_sigma(RID p_env) const;
+	float environment_get_dxr_ao_denoise_normal_sigma(RID p_env) const;
+	float environment_get_dxr_ao_denoise_blend_factor(RID p_env) const;
 	void environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count);
 	bool environment_get_dxr_gi_enabled(RID p_env) const;
 	float environment_get_dxr_gi_max_distance(RID p_env) const;

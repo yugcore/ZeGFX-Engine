@@ -3102,6 +3102,7 @@ void RenderingServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("environment_set_ssr", "env", "enable", "max_steps", "fade_in", "fade_out", "depth_tolerance"), &RenderingServer::environment_set_ssr);
 	ClassDB::bind_method(D_METHOD("environment_set_dxr_reflections", "env", "enable", "roughness_threshold"), &RenderingServer::environment_set_dxr_reflections);
 	ClassDB::bind_method(D_METHOD("environment_set_dxr_ao", "env", "enable", "radius", "intensity", "power", "samples"), &RenderingServer::environment_set_dxr_ao, DEFVAL(1.0f), DEFVAL(4));
+	ClassDB::bind_method(D_METHOD("environment_set_dxr_ao_denoise", "env", "enable", "radius", "depth_sigma", "normal_sigma", "blend_factor"), &RenderingServer::environment_set_dxr_ao_denoise, DEFVAL(2), DEFVAL(0.05f), DEFVAL(32.0f), DEFVAL(0.05f));
 	ClassDB::bind_method(D_METHOD("environment_set_dxr_gi", "env", "enable", "max_distance", "energy", "bounce_count"), &RenderingServer::environment_set_dxr_gi);
 	ClassDB::bind_method(D_METHOD("environment_set_dxr_shadows", "env", "enable", "softness", "max_distance", "samples"), &RenderingServer::environment_set_dxr_shadows);
 	ClassDB::bind_method(D_METHOD("environment_set_ssao", "env", "enable", "radius", "intensity", "power", "detail", "horizon", "sharpness", "light_affect", "ao_channel_affect"), &RenderingServer::environment_set_ssao);
@@ -3824,6 +3825,11 @@ void RenderingServer::init() {
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/ao_power", PROPERTY_HINT_RANGE, "0.1,16.0,0.01"), 1.0);
 	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/d3d12/raytracing/ao_samples", PROPERTY_HINT_RANGE, "1,16,1"), 4);
 	GLOBAL_DEF("rendering/d3d12/raytracing/fallback_to_ssao", true);
+	GLOBAL_DEF("rendering/d3d12/raytracing/denoise_enabled", true);
+	GLOBAL_DEF(PropertyInfo(Variant::INT, "rendering/d3d12/raytracing/denoise_radius", PROPERTY_HINT_RANGE, "1,8,1"), 2);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/denoise_depth_sigma", PROPERTY_HINT_RANGE, "0.001,1.0,0.001"), 0.05);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/denoise_normal_sigma", PROPERTY_HINT_RANGE, "1.0,128.0,0.1"), 32.0);
+	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/denoise_blend_factor", PROPERTY_HINT_RANGE, "0.01,0.5,0.01"), 0.05);
 	GLOBAL_DEF("rendering/d3d12/raytracing/gi_enabled", true);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/gi_max_distance", PROPERTY_HINT_RANGE, "1.0,512.0,1.0"), 64.0);
 	GLOBAL_DEF(PropertyInfo(Variant::FLOAT, "rendering/d3d12/raytracing/gi_energy", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), 1.0);

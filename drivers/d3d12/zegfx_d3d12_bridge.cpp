@@ -191,7 +191,11 @@ bool ZeGFXD3D12Bridge::execute_shadow_pass(float p_near_clip, float p_far_clip, 
 }
 
 // --- Phase 2: AO pass — computes and routes ZeGFX DXR RTAO & GTAO ---
-bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity, float p_power, int p_samples) {
+bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity,
+		float p_power, int p_samples,
+		bool p_denoise, int p_denoise_radius,
+		float p_depth_sigma, float p_normal_sigma,
+		float p_blend_factor) {
 	if (!initialized) {
 		return false;
 	}
@@ -204,6 +208,12 @@ bool ZeGFXD3D12Bridge::execute_ao_pass(int p_width, int p_height, float p_radius
 	pending_ao.intensity = p_intensity;
 	pending_ao.power = p_power;
 	pending_ao.samples = p_samples;
+
+	pending_dxr_denoiser.enabled = p_denoise;
+	pending_dxr_denoiser.blur_radius = CLAMP(p_denoise_radius, 1, 8);
+	pending_dxr_denoiser.depth_sigma = MAX(0.001f, p_depth_sigma);
+	pending_dxr_denoiser.normal_sigma = MAX(1.0f, p_normal_sigma);
+	pending_dxr_denoiser.blend_factor = CLAMP(p_blend_factor, 0.01f, 0.5f);
 
 	// Propagate AO settings to the PostComposite subsystem immediately
 	if (post_composite && post_composite->is_initialized()) {
@@ -591,6 +601,19 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 				pending_ao.intensity,
 				pending_ao.power,
 				pending_ao.samples);
+
+		if (pending_dxr_denoiser.enabled) {
+			dxr_pipeline->dispatch_ao_denoise(
+					static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
+					static_cast<ID3D12Resource *>(p_hdr_target),
+					static_cast<ID3D12Resource *>(p_depth_target),
+					static_cast<ID3D12Resource *>(p_normal_target),
+					p_width, p_height,
+					pending_dxr_denoiser.blur_radius,
+					pending_dxr_denoiser.depth_sigma,
+					pending_dxr_denoiser.normal_sigma,
+					pending_dxr_denoiser.blend_factor);
+		}
 #if defined(DXR_DESCRIPTOR_TABLES_BOUND)
 		ao_pass_succeeded = true;
 #else

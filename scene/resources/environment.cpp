@@ -380,6 +380,51 @@ int Environment::get_dxr_ao_samples() const {
 	return dxr_ao_samples;
 }
 
+void Environment::set_dxr_ao_denoise_enabled(bool p_enabled) {
+	dxr_ao_denoise_enabled = p_enabled;
+	_update_dxr();
+}
+
+bool Environment::is_dxr_ao_denoise_enabled() const {
+	return dxr_ao_denoise_enabled;
+}
+
+void Environment::set_dxr_ao_denoise_radius(int p_radius) {
+	dxr_ao_denoise_radius = CLAMP(p_radius, 1, 8);
+	_update_dxr();
+}
+
+int Environment::get_dxr_ao_denoise_radius() const {
+	return dxr_ao_denoise_radius;
+}
+
+void Environment::set_dxr_ao_denoise_depth_sigma(float p_sigma) {
+	dxr_ao_denoise_depth_sigma = MAX(0.001f, p_sigma);
+	_update_dxr();
+}
+
+float Environment::get_dxr_ao_denoise_depth_sigma() const {
+	return dxr_ao_denoise_depth_sigma;
+}
+
+void Environment::set_dxr_ao_denoise_normal_sigma(float p_sigma) {
+	dxr_ao_denoise_normal_sigma = MAX(1.0f, p_sigma);
+	_update_dxr();
+}
+
+float Environment::get_dxr_ao_denoise_normal_sigma() const {
+	return dxr_ao_denoise_normal_sigma;
+}
+
+void Environment::set_dxr_ao_denoise_blend_factor(float p_blend) {
+	dxr_ao_denoise_blend_factor = CLAMP(p_blend, 0.01f, 0.5f);
+	_update_dxr();
+}
+
+float Environment::get_dxr_ao_denoise_blend_factor() const {
+	return dxr_ao_denoise_blend_factor;
+}
+
 void Environment::set_dxr_gi_enabled(bool p_enabled) {
 	dxr_gi_enabled = p_enabled;
 	_update_dxr();
@@ -465,6 +510,13 @@ void Environment::_update_dxr() {
 				dxr_ao_intensity,
 				dxr_ao_power,
 				dxr_ao_samples);
+		RS::get_singleton()->environment_set_dxr_ao_denoise(
+				environment,
+				dxr_ao_denoise_enabled,
+				dxr_ao_denoise_radius,
+				dxr_ao_denoise_depth_sigma,
+				dxr_ao_denoise_normal_sigma,
+				dxr_ao_denoise_blend_factor);
 		RS::get_singleton()->environment_set_dxr_gi(
 				environment,
 				dxr_gi_enabled,
@@ -1517,6 +1569,16 @@ void Environment::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_dxr_ao_power"), &Environment::get_dxr_ao_power);
 	ClassDB::bind_method(D_METHOD("set_dxr_ao_samples", "samples"), &Environment::set_dxr_ao_samples);
 	ClassDB::bind_method(D_METHOD("get_dxr_ao_samples"), &Environment::get_dxr_ao_samples);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_denoise_enabled", "enabled"), &Environment::set_dxr_ao_denoise_enabled);
+	ClassDB::bind_method(D_METHOD("is_dxr_ao_denoise_enabled"), &Environment::is_dxr_ao_denoise_enabled);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_denoise_radius", "radius"), &Environment::set_dxr_ao_denoise_radius);
+	ClassDB::bind_method(D_METHOD("get_dxr_ao_denoise_radius"), &Environment::get_dxr_ao_denoise_radius);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_denoise_depth_sigma", "depth_sigma"), &Environment::set_dxr_ao_denoise_depth_sigma);
+	ClassDB::bind_method(D_METHOD("get_dxr_ao_denoise_depth_sigma"), &Environment::get_dxr_ao_denoise_depth_sigma);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_denoise_normal_sigma", "normal_sigma"), &Environment::set_dxr_ao_denoise_normal_sigma);
+	ClassDB::bind_method(D_METHOD("get_dxr_ao_denoise_normal_sigma"), &Environment::get_dxr_ao_denoise_normal_sigma);
+	ClassDB::bind_method(D_METHOD("set_dxr_ao_denoise_blend_factor", "blend_factor"), &Environment::set_dxr_ao_denoise_blend_factor);
+	ClassDB::bind_method(D_METHOD("get_dxr_ao_denoise_blend_factor"), &Environment::get_dxr_ao_denoise_blend_factor);
 	ClassDB::bind_method(D_METHOD("set_dxr_gi_enabled", "enabled"), &Environment::set_dxr_gi_enabled);
 	ClassDB::bind_method(D_METHOD("is_dxr_gi_enabled"), &Environment::is_dxr_gi_enabled);
 	ClassDB::bind_method(D_METHOD("set_dxr_gi_max_distance", "distance"), &Environment::set_dxr_gi_max_distance);
@@ -1542,6 +1604,11 @@ void Environment::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_intensity", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), "set_dxr_ao_intensity", "get_dxr_ao_intensity");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_power", PROPERTY_HINT_RANGE, "0.1,16.0,0.01"), "set_dxr_ao_power", "get_dxr_ao_power");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "dxr_ao_samples", PROPERTY_HINT_RANGE, "1,16,1"), "set_dxr_ao_samples", "get_dxr_ao_samples");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "dxr_ao_denoise_enabled"), "set_dxr_ao_denoise_enabled", "is_dxr_ao_denoise_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "dxr_ao_denoise_radius", PROPERTY_HINT_RANGE, "1,8,1"), "set_dxr_ao_denoise_radius", "get_dxr_ao_denoise_radius");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_denoise_depth_sigma", PROPERTY_HINT_RANGE, "0.001,1.0,0.001"), "set_dxr_ao_denoise_depth_sigma", "get_dxr_ao_denoise_depth_sigma");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_denoise_normal_sigma", PROPERTY_HINT_RANGE, "1.0,128.0,0.1"), "set_dxr_ao_denoise_normal_sigma", "get_dxr_ao_denoise_normal_sigma");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_ao_denoise_blend_factor", PROPERTY_HINT_RANGE, "0.01,0.5,0.01"), "set_dxr_ao_denoise_blend_factor", "get_dxr_ao_denoise_blend_factor");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "dxr_gi_enabled"), "set_dxr_gi_enabled", "is_dxr_gi_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_gi_max_distance", PROPERTY_HINT_RANGE, "1.0,512.0,1.0"), "set_dxr_gi_max_distance", "get_dxr_gi_max_distance");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "dxr_gi_energy", PROPERTY_HINT_RANGE, "0.0,16.0,0.01"), "set_dxr_gi_energy", "get_dxr_gi_energy");

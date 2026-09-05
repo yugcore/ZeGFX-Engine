@@ -223,6 +223,12 @@ public:
 	float environment_get_dxr_ao_intensity(RID p_env) const;
 	float environment_get_dxr_ao_power(RID p_env) const;
 	int environment_get_dxr_ao_samples(RID p_env) const;
+	void environment_set_dxr_ao_denoise(RID p_env, bool p_enable, int p_radius, float p_depth_sigma, float p_normal_sigma, float p_blend_factor);
+	bool environment_get_dxr_ao_denoise_enabled(RID p_env) const;
+	int environment_get_dxr_ao_denoise_radius(RID p_env) const;
+	float environment_get_dxr_ao_denoise_depth_sigma(RID p_env) const;
+	float environment_get_dxr_ao_denoise_normal_sigma(RID p_env) const;
+	float environment_get_dxr_ao_denoise_blend_factor(RID p_env) const;
 	bool environment_get_ssao_enabled(RID p_env) const;
 	float environment_get_ssao_radius(RID p_env) const;
 	float environment_get_ssao_intensity(RID p_env) const;

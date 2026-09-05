@@ -136,6 +136,11 @@ private:
 	float dxr_ao_intensity = 1.0f;
 	float dxr_ao_power = 1.0f;
 	int dxr_ao_samples = 4;
+	bool dxr_ao_denoise_enabled = true;
+	int dxr_ao_denoise_radius = 2;
+	float dxr_ao_denoise_depth_sigma = 0.05f;
+	float dxr_ao_denoise_normal_sigma = 32.0f;
+	float dxr_ao_denoise_blend_factor = 0.05f;
 	bool dxr_gi_enabled = true;
 	float dxr_gi_max_distance = 64.0f;
 	float dxr_gi_energy = 1.0f;
@@ -324,6 +329,16 @@ public:
 	float get_dxr_ao_power() const;
 	void set_dxr_ao_samples(int p_samples);
 	int get_dxr_ao_samples() const;
+	void set_dxr_ao_denoise_enabled(bool p_enabled);
+	bool is_dxr_ao_denoise_enabled() const;
+	void set_dxr_ao_denoise_radius(int p_radius);
+	int get_dxr_ao_denoise_radius() const;
+	void set_dxr_ao_denoise_depth_sigma(float p_sigma);
+	float get_dxr_ao_denoise_depth_sigma() const;
+	void set_dxr_ao_denoise_normal_sigma(float p_sigma);
+	float get_dxr_ao_denoise_normal_sigma() const;
+	void set_dxr_ao_denoise_blend_factor(float p_blend);
+	float get_dxr_ao_denoise_blend_factor() const;
 	void set_dxr_gi_enabled(bool p_enabled);
 	bool is_dxr_gi_enabled() const;
 	void set_dxr_gi_max_distance(float p_distance);

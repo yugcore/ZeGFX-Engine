@@ -1320,6 +1320,7 @@ public:
 	// SSAO
 	PASS10(environment_set_ssao, RID, bool, float, float, float, float, float, float, float, float)
 	PASS6(environment_set_dxr_ao, RID, bool, float, float, float, int)
+	PASS6(environment_set_dxr_ao_denoise, RID, bool, int, float, float, float)
 
 	PASS1RC(bool, environment_get_ssao_enabled, RID)
 	PASS1RC(float, environment_get_ssao_radius, RID)

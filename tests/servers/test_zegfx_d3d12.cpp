@@ -73,6 +73,33 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
         CHECK(bridge.execute_ao_pass(1920, 1080, 1.5f, 1.0f, 1.0f, 4));
         CHECK_FALSE(bridge.ao_pass_active()); // returns false because no command list is attached
 
+        // DXR Denoiser controls
+        CHECK(bridge.is_dxr_denoise_enabled());
+        CHECK(bridge.get_dxr_denoise_radius() == 2);
+        CHECK(bridge.get_dxr_denoise_depth_sigma() == doctest::Approx(0.05f));
+        CHECK(bridge.get_dxr_denoise_normal_sigma() == doctest::Approx(32.0f));
+        CHECK(bridge.get_dxr_denoise_blend_factor() == doctest::Approx(0.05f));
+
+        bridge.set_dxr_denoise_enabled(false);
+        CHECK_FALSE(bridge.is_dxr_denoise_enabled());
+        bridge.set_dxr_denoise_enabled(true);
+
+        bridge.set_dxr_denoise_radius(4);
+        CHECK(bridge.get_dxr_denoise_radius() == 4);
+        bridge.set_dxr_denoise_radius(0);
+        CHECK(bridge.get_dxr_denoise_radius() == 1);
+        bridge.set_dxr_denoise_radius(20);
+        CHECK(bridge.get_dxr_denoise_radius() == 8);
+
+        bridge.set_dxr_denoise_blend_factor(0.12f);
+        CHECK(bridge.get_dxr_denoise_blend_factor() == doctest::Approx(0.12f));
+        bridge.set_dxr_denoise_blend_factor(0.0001f);
+        CHECK(bridge.get_dxr_denoise_blend_factor() == doctest::Approx(0.01f));
+        bridge.set_dxr_denoise_blend_factor(0.9f);
+        CHECK(bridge.get_dxr_denoise_blend_factor() == doctest::Approx(0.5f));
+
+        CHECK(bridge.execute_ao_pass(1920, 1080, 1.5f, 1.0f, 1.0f, 4, true, 3, 0.04f, 40.0f, 0.08f));
+
         // DXR reflections will return false without ID3D12Device initialization
         CHECK_FALSE(bridge.execute_dxr_reflections_pass(1920, 1080, 0.5f));
         CHECK_FALSE(bridge.dxr_reflections_active());
@@ -198,6 +225,41 @@ TEST_CASE("[ZeGFX][D3D12] Hardware Capabilities and Pipeline State Manager") {
 
         env->set_dxr_ao_samples(32);
         CHECK(env->get_dxr_ao_samples() == 16);
+
+        // DXR AO Denoiser validation
+        CHECK(env->is_dxr_ao_denoise_enabled());
+        CHECK(env->get_dxr_ao_denoise_radius() == 2);
+        CHECK(env->get_dxr_ao_denoise_depth_sigma() == doctest::Approx(0.05f));
+        CHECK(env->get_dxr_ao_denoise_normal_sigma() == doctest::Approx(32.0f));
+        CHECK(env->get_dxr_ao_denoise_blend_factor() == doctest::Approx(0.05f));
+
+        env->set_dxr_ao_denoise_enabled(false);
+        CHECK_FALSE(env->is_dxr_ao_denoise_enabled());
+        env->set_dxr_ao_denoise_enabled(true);
+
+        env->set_dxr_ao_denoise_radius(6);
+        CHECK(env->get_dxr_ao_denoise_radius() == 6);
+        env->set_dxr_ao_denoise_radius(-1);
+        CHECK(env->get_dxr_ao_denoise_radius() == 1);
+        env->set_dxr_ao_denoise_radius(12);
+        CHECK(env->get_dxr_ao_denoise_radius() == 8);
+
+        env->set_dxr_ao_denoise_depth_sigma(0.08f);
+        CHECK(env->get_dxr_ao_denoise_depth_sigma() == doctest::Approx(0.08f));
+        env->set_dxr_ao_denoise_depth_sigma(-0.5f);
+        CHECK(env->get_dxr_ao_denoise_depth_sigma() == doctest::Approx(0.001f));
+
+        env->set_dxr_ao_denoise_normal_sigma(64.0f);
+        CHECK(env->get_dxr_ao_denoise_normal_sigma() == doctest::Approx(64.0f));
+        env->set_dxr_ao_denoise_normal_sigma(0.1f);
+        CHECK(env->get_dxr_ao_denoise_normal_sigma() == doctest::Approx(1.0f));
+
+        env->set_dxr_ao_denoise_blend_factor(0.15f);
+        CHECK(env->get_dxr_ao_denoise_blend_factor() == doctest::Approx(0.15f));
+        env->set_dxr_ao_denoise_blend_factor(0.001f);
+        CHECK(env->get_dxr_ao_denoise_blend_factor() == doctest::Approx(0.01f));
+        env->set_dxr_ao_denoise_blend_factor(1.0f);
+        CHECK(env->get_dxr_ao_denoise_blend_factor() == doctest::Approx(0.5f));
 
         // DXR GI validation
         CHECK(env->is_dxr_gi_enabled());

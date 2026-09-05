@@ -633,6 +633,30 @@ int RendererSceneRender::environment_get_dxr_ao_samples(RID p_env) const {
 	return environment_storage.environment_get_dxr_ao_samples(p_env);
 }
 
+void RendererSceneRender::environment_set_dxr_ao_denoise(RID p_env, bool p_enable, int p_radius, float p_depth_sigma, float p_normal_sigma, float p_blend_factor) {
+	environment_storage.environment_set_dxr_ao_denoise(p_env, p_enable, p_radius, p_depth_sigma, p_normal_sigma, p_blend_factor);
+}
+
+bool RendererSceneRender::environment_get_dxr_ao_denoise_enabled(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_denoise_enabled(p_env);
+}
+
+int RendererSceneRender::environment_get_dxr_ao_denoise_radius(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_denoise_radius(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_ao_denoise_depth_sigma(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_denoise_depth_sigma(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_ao_denoise_normal_sigma(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_denoise_normal_sigma(p_env);
+}
+
+float RendererSceneRender::environment_get_dxr_ao_denoise_blend_factor(RID p_env) const {
+	return environment_storage.environment_get_dxr_ao_denoise_blend_factor(p_env);
+}
+
 void RendererSceneRender::environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count) {
 	environment_storage.environment_set_dxr_gi(p_env, p_enable, p_max_distance, p_energy, p_bounce_count);
 }

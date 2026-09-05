@@ -72,6 +72,16 @@ private:
 		int samples = 4;
 	} pending_ao;
 
+	// --- Deferred DXR denoiser state ---
+	struct PendingDXRDenoiser {
+		bool enabled = true;
+		int blur_radius = 2;
+		float depth_sigma = 0.05f;
+		float normal_sigma = 32.0f;
+		float blend_factor = 0.05f;
+		int mode = 3; // 1 = spatial bilateral, 2 = temporal, 3 = spatio-temporal SVGF
+	} pending_dxr_denoiser;
+
 	// --- Deferred DXR reflections state ---
 	struct PendingDXRReflections {
 		bool dirty = false;
@@ -202,11 +212,29 @@ public:
 	DXRDebugDrawMode get_dxr_debug_mode() const { return active_debug_mode; }
 	bool is_dxr_debug_active() const { return active_debug_mode != DXR_DEBUG_DISABLED; }
 
+	// DXR Ray Tracing Denoiser Controls (SVGF / Bilateral)
+	void set_dxr_denoise_enabled(bool p_enabled) { pending_dxr_denoiser.enabled = p_enabled; }
+	bool is_dxr_denoise_enabled() const { return pending_dxr_denoiser.enabled; }
+	void set_dxr_denoise_radius(int p_radius) { pending_dxr_denoiser.blur_radius = CLAMP(p_radius, 1, 8); }
+	int get_dxr_denoise_radius() const { return pending_dxr_denoiser.blur_radius; }
+	void set_dxr_denoise_depth_sigma(float p_sigma) { pending_dxr_denoiser.depth_sigma = MAX(0.001f, p_sigma); }
+	float get_dxr_denoise_depth_sigma() const { return pending_dxr_denoiser.depth_sigma; }
+	void set_dxr_denoise_normal_sigma(float p_sigma) { pending_dxr_denoiser.normal_sigma = MAX(1.0f, p_sigma); }
+	float get_dxr_denoise_normal_sigma() const { return pending_dxr_denoiser.normal_sigma; }
+	void set_dxr_denoise_blend_factor(float p_blend) { pending_dxr_denoiser.blend_factor = CLAMP(p_blend, 0.01f, 0.5f); }
+	float get_dxr_denoise_blend_factor() const { return pending_dxr_denoiser.blend_factor; }
+	void set_dxr_denoise_mode(int p_mode) { pending_dxr_denoiser.mode = CLAMP(p_mode, 1, 3); }
+	int get_dxr_denoise_mode() const { return pending_dxr_denoiser.mode; }
+
 	// Phase 1 Subsystem Swap: godotShadow -> zegfxShadow
 	bool execute_shadow_pass(float p_near_clip, float p_far_clip, uint32_t p_cascade_count, Vector<float> &r_splits);
 
-	// Phase 2 Subsystem Swap: godotAO -> zegfxAO (DXR RTAO / GTAO)
-	bool execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity, float p_power = 1.0f, int p_samples = 4);
+	// Phase 2 Subsystem Swap: godotAO -> zegfxAO (DXR RTAO / GTAO with Spatio-Temporal Denoiser)
+	bool execute_ao_pass(int p_width, int p_height, float p_radius, float p_intensity,
+			float p_power = 1.0f, int p_samples = 4,
+			bool p_denoise = true, int p_denoise_radius = 2,
+			float p_depth_sigma = 0.05f, float p_normal_sigma = 32.0f,
+			float p_blend_factor = 0.05f);
 
 	// Phase 3 Subsystem Swap: godotSSR -> zegfxDXR
 	bool execute_dxr_reflections_pass(int p_width, int p_height, float p_roughness_threshold);

@@ -751,6 +751,46 @@ int RendererEnvironmentStorage::environment_get_dxr_ao_samples(RID p_env) const 
 	return env->dxr_ao_samples;
 }
 
+void RendererEnvironmentStorage::environment_set_dxr_ao_denoise(RID p_env, bool p_enable, int p_radius, float p_depth_sigma, float p_normal_sigma, float p_blend_factor) {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL(env);
+	env->dxr_ao_denoise_enabled = p_enable;
+	env->dxr_ao_denoise_radius = CLAMP(p_radius, 1, 8);
+	env->dxr_ao_denoise_depth_sigma = MAX(0.001f, p_depth_sigma);
+	env->dxr_ao_denoise_normal_sigma = MAX(1.0f, p_normal_sigma);
+	env->dxr_ao_denoise_blend_factor = CLAMP(p_blend_factor, 0.01f, 0.5f);
+}
+
+bool RendererEnvironmentStorage::environment_get_dxr_ao_denoise_enabled(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, true);
+	return env->dxr_ao_denoise_enabled;
+}
+
+int RendererEnvironmentStorage::environment_get_dxr_ao_denoise_radius(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 2);
+	return env->dxr_ao_denoise_radius;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_ao_denoise_depth_sigma(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 0.05f);
+	return env->dxr_ao_denoise_depth_sigma;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_ao_denoise_normal_sigma(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 32.0f);
+	return env->dxr_ao_denoise_normal_sigma;
+}
+
+float RendererEnvironmentStorage::environment_get_dxr_ao_denoise_blend_factor(RID p_env) const {
+	Environment *env = environment_owner.get_or_null(p_env);
+	ERR_FAIL_NULL_V(env, 0.05f);
+	return env->dxr_ao_denoise_blend_factor;
+}
+
 void RendererEnvironmentStorage::environment_set_dxr_gi(RID p_env, bool p_enable, float p_max_distance, float p_energy, int p_bounce_count) {
 	Environment *env = environment_owner.get_or_null(p_env);
 	ERR_FAIL_NULL(env);

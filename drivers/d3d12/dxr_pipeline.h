@@ -57,6 +57,17 @@ struct DXRDebugConstants {
     float padding = 0.0f;
 };
 
+struct DXRDenoiseConstants {
+    float blend_factor = 0.05f;
+    float depth_threshold = 0.01f;
+    int blur_radius = 2;
+    float depth_sigma = 0.05f;
+    float normal_sigma = 32.0f;
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t denoise_mode = 3; // 1 = Spatial Bilateral, 2 = Temporal, 3 = Spatio-Temporal SVGF
+};
+
 class DXRPipelineD3D12 {
 public:
     DXRPipelineD3D12();
@@ -124,6 +135,19 @@ public:
         float p_intensity,
         float p_power,
         int p_samples
+    );
+
+    void dispatch_ao_denoise(
+        ID3D12GraphicsCommandList* p_cmd_list,
+        ID3D12Resource* p_ao_target,
+        ID3D12Resource* p_depth_target,
+        ID3D12Resource* p_normal_target,
+        int p_width,
+        int p_height,
+        int p_radius,
+        float p_depth_sigma,
+        float p_normal_sigma,
+        float p_blend_factor
     );
 
     void dispatch_debug_rays(

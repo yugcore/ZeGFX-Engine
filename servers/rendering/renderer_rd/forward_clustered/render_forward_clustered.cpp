@@ -1451,6 +1451,11 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 		float intensity = GLOBAL_GET("rendering/d3d12/raytracing/ao_intensity");
 		float power = GLOBAL_GET("rendering/d3d12/raytracing/ao_power");
 		int samples = GLOBAL_GET("rendering/d3d12/raytracing/ao_samples");
+		bool denoise_enabled = GLOBAL_GET("rendering/d3d12/raytracing/denoise_enabled");
+		int denoise_radius = GLOBAL_GET("rendering/d3d12/raytracing/denoise_radius");
+		float denoise_depth_sigma = GLOBAL_GET("rendering/d3d12/raytracing/denoise_depth_sigma");
+		float denoise_normal_sigma = GLOBAL_GET("rendering/d3d12/raytracing/denoise_normal_sigma");
+		float denoise_blend_factor = GLOBAL_GET("rendering/d3d12/raytracing/denoise_blend_factor");
 
 		bool dxr_ao_allowed = dxr_global_enabled && dxr_ao_global_enabled;
 		if (p_environment.is_valid()) {
@@ -1459,11 +1464,17 @@ void RenderForwardClustered::_process_ssao(Ref<RenderSceneBuffersRD> p_render_bu
 			intensity = environment_get_dxr_ao_intensity(p_environment);
 			power = environment_get_dxr_ao_power(p_environment);
 			samples = environment_get_dxr_ao_samples(p_environment);
+			denoise_enabled = environment_get_dxr_ao_denoise_enabled(p_environment);
+			denoise_radius = environment_get_dxr_ao_denoise_radius(p_environment);
+			denoise_depth_sigma = environment_get_dxr_ao_denoise_depth_sigma(p_environment);
+			denoise_normal_sigma = environment_get_dxr_ao_denoise_normal_sigma(p_environment);
+			denoise_blend_factor = environment_get_dxr_ao_denoise_blend_factor(p_environment);
 		}
 
 		if (dxr_ao_allowed) {
 			Size2i size = p_render_buffers->get_internal_size();
-			if (ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity, power, samples)) {
+			if (ZeGFXD3D12Bridge::get_singleton()->execute_ao_pass(size.x, size.y, radius, intensity, power, samples,
+					denoise_enabled, denoise_radius, denoise_depth_sigma, denoise_normal_sigma, denoise_blend_factor)) {
 				if (ZeGFXD3D12Bridge::get_singleton()->ao_pass_active()) {
 					return;
 				}
