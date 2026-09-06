@@ -424,7 +424,7 @@ class DisplayServerWindows : public DisplayServer {
 
 	DisplayServerEnums::WindowID last_focused_window = DisplayServerEnums::INVALID_WINDOW_ID;
 	DisplayServerEnums::WindowID last_mouse_button_down_window = DisplayServerEnums::INVALID_WINDOW_ID;
-	HCURSOR hCursor;
+	HCURSOR hCursor = nullptr;
 
 	WNDPROC user_proc = nullptr;
 

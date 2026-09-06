@@ -262,6 +262,7 @@ xcuserdata/
 
 # Build results
 [Dd]ebug/
+!modules/gameplay/debug/
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/

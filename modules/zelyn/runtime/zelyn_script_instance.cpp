@@ -7,6 +7,7 @@
 #include "bridge/zelyn_variant_bridge.h"
 
 #include "scene/main/node.h"
+#include "core/config/engine.h"
 
 void ZelynScriptInstance::_wire_declarative_signals() {
 	if (!owner || !script.is_valid()) return;
@@ -165,6 +166,15 @@ Variant ZelynScriptInstance::callp(const StringName &p_method, const Variant **p
 }
 
 void ZelynScriptInstance::notification(int p_notification, bool p_reversed) {
+	if (Engine::get_singleton() && Engine::get_singleton()->is_editor_hint()) {
+		if (!script.is_valid() || !script->is_tool()) {
+			if (p_notification == Object::NOTIFICATION_PREDELETE) {
+				member_properties.clear();
+			}
+			return;
+		}
+	}
+
 	switch (p_notification) {
 		case Node::NOTIFICATION_READY: {
 			_wire_declarative_signals();

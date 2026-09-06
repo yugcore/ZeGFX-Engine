@@ -3385,7 +3385,11 @@ void DisplayServerWindows::cursor_set_shape(DisplayServerEnums::CursorShape p_sh
 	if (cursors_cache.has(p_shape)) {
 		SetCursor(cursors[p_shape]);
 	} else {
-		SetCursor(LoadCursor(hInstance, win_cursors[p_shape]));
+		HCURSOR cur = LoadCursor(nullptr, win_cursors[p_shape]);
+		if (!cur && hInstance) {
+			cur = LoadCursor(hInstance, win_cursors[p_shape]);
+		}
+		SetCursor(cur);
 	}
 
 	cursor_shape = p_shape;
@@ -6988,13 +6992,45 @@ LRESULT DisplayServerWindows::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARA
 					} else {
 						SetCursor(nullptr);
 					}
+					return TRUE;
 				} else {
 					if (hCursor != nullptr) {
 						DisplayServerEnums::CursorShape c = cursor_shape;
 						cursor_shape = DisplayServerEnums::CURSOR_MAX;
 						cursor_set_shape(c);
 						hCursor = nullptr;
+					} else {
+						DisplayServerEnums::CursorShape c = cursor_shape;
+						if (cursors_cache.has(c)) {
+							SetCursor(cursors[c]);
+						} else {
+							static const LPCTSTR win_cursors[DisplayServerEnums::CURSOR_MAX] = {
+								IDC_ARROW,
+								IDC_IBEAM,
+								IDC_HAND, // Finger.
+								IDC_CROSS,
+								IDC_WAIT,
+								IDC_APPSTARTING,
+								IDC_SIZEALL,
+								IDC_ARROW,
+								IDC_NO,
+								IDC_SIZENS,
+								IDC_SIZEWE,
+								IDC_SIZENESW,
+								IDC_SIZENWSE,
+								IDC_SIZEALL,
+								IDC_SIZENS,
+								IDC_SIZEWE,
+								IDC_HELP
+							};
+							HCURSOR cur = LoadCursor(nullptr, win_cursors[c]);
+							if (!cur && hInstance) {
+								cur = LoadCursor(hInstance, win_cursors[c]);
+							}
+							SetCursor(cur);
+						}
 					}
+					return TRUE;
 				}
 			}
 		} break;
@@ -8029,7 +8065,7 @@ DisplayServerWindows::DisplayServerWindows(const String &p_rendering_driver, Dis
 	wc.cbWndExtra = 0;
 	wc.hInstance = hInstance ? hInstance : GetModuleHandle(nullptr);
 	wc.hIcon = default_icon;
-	wc.hCursor = nullptr;
+	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	wc.hbrBackground = nullptr;
 	wc.lpszMenuName = nullptr;
 	wc.lpszClassName = L"Engine";

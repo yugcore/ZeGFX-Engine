@@ -963,7 +963,11 @@ RDD::BufferID RenderingDeviceDriverD3D12::buffer_create(uint64_t p_size, BitFiel
 				IID_PPV_ARGS(buffer.GetAddressOf()));
 	}
 
-	ERR_FAIL_COND_V_MSG(!SUCCEEDED(res), BufferID(), "Can't create buffer of size: " + itos(p_size) + ", error " + vformat("0x%08ux", (uint64_t)res) + ".");
+	if (!SUCCEEDED(res)) {
+		HRESULT rem = (device != nullptr) ? device->GetDeviceRemovedReason() : S_OK;
+		String rem_msg = (rem != S_OK) ? (", DeviceRemovedReason: " + vformat("0x%08ux", (uint64_t)rem)) : "";
+		ERR_FAIL_V_MSG(BufferID(), "Can't create buffer of size: " + itos(p_size) + ", error " + vformat("0x%08ux", (uint64_t)res) + rem_msg + ".");
+	}
 
 	// If device address usage is requested, create a UAV descriptor expected by spirv2dxil.
 	DescriptorHeap::Allocation device_address_uav_alloc = {};
@@ -2880,7 +2884,12 @@ Error RenderingDeviceDriverD3D12::swap_chain_resize(CommandQueueID p_cmd_queue, 
 	if (swap_chain->d3d_swap_chain != nullptr) {
 		_swap_chain_release_buffers(swap_chain);
 		res = swap_chain->d3d_swap_chain->ResizeBuffers(p_desired_framebuffer_count, target_width, target_height, DXGI_FORMAT_UNKNOWN, creation_flags);
-		ERR_FAIL_COND_V(!SUCCEEDED(res), ERR_UNAVAILABLE);
+		if (!SUCCEEDED(res)) {
+			HRESULT rem = (device != nullptr) ? device->GetDeviceRemovedReason() : S_OK;
+			String rem_msg = (rem != S_OK) ? (", DeviceRemovedReason: " + vformat("0x%08ux", (uint64_t)rem)) : "";
+			ERR_PRINT("D3D12: swap_chain_resize ResizeBuffers failed with error " + vformat("0x%08ux", (uint64_t)res) + rem_msg + ".");
+			ERR_FAIL_V(ERR_UNAVAILABLE);
+		}
 	} else {
 		DEV_ASSERT(swap_chain->render_pass.id == 0);
 		swap_chain->render_pass = _swap_chain_create_render_pass(new_data_format);
@@ -6581,6 +6590,9 @@ Error RenderingDeviceDriverD3D12::initialize(uint32_t p_device_index, uint32_t p
 
 	if (ZeGFXD3D12Bridge::get_singleton()) {
 		ZeGFXD3D12Bridge::get_singleton()->initialize_device(device.Get());
+		ZeGFXD3D12Bridge::get_singleton()->set_godot_descriptor_heaps(
+				resource_descriptor_heap.heap.Get(),
+				sampler_descriptor_heap.heap.Get());
 	}
 
 	return OK;

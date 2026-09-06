@@ -373,6 +373,9 @@ void ZelynLanguageFeatures::register_godot_builtins(NativeRegistry &reg) {
 	// --- 3D Scene, CharacterBody3D & Input System ---
 	reg.bindFast("Input.set_mouse_mode", [](RuntimeContext *ctx, Value *args, int argCount) -> Value {
 		if (argCount >= 1 && Input::get_singleton()) {
+			if (Engine::get_singleton() && Engine::get_singleton()->is_editor_hint()) {
+				return Value();
+			}
 			Input::get_singleton()->set_mouse_mode((Input::MouseMode)(int)args[0].number);
 		}
 		return Value();
@@ -388,7 +391,8 @@ void ZelynLanguageFeatures::register_godot_builtins(NativeRegistry &reg) {
 	reg.bindFast("Input.is_key_pressed", [](RuntimeContext *ctx, Value *args, int argCount) -> Value {
 		if (argCount >= 1 && Input::get_singleton()) {
 			Key k = (Key)(int64_t)args[0].number;
-			return Value(Value::BOOL, Input::get_singleton()->is_key_pressed(k) ? 1.0 : 0.0);
+			bool pressed = Input::get_singleton()->is_key_pressed(k) || Input::get_singleton()->is_physical_key_pressed(k);
+			return Value(Value::BOOL, pressed ? 1.0 : 0.0);
 		}
 		return Value(Value::BOOL, 0.0);
 	}, 1, 1);
@@ -397,7 +401,8 @@ void ZelynLanguageFeatures::register_godot_builtins(NativeRegistry &reg) {
 		if (argCount >= 1 && Input::get_singleton()) {
 			if (args[0].type == ValueType::Number) {
 				Key k = (Key)(int64_t)args[0].number;
-				return Value(Value::BOOL, Input::get_singleton()->is_key_pressed(k) ? 1.0 : 0.0);
+				bool is_down = Input::get_singleton()->is_key_pressed(k) || Input::get_singleton()->is_physical_key_pressed(k);
+				return Value(Value::BOOL, is_down ? 1.0 : 0.0);
 			} else if (args[0].type == ValueType::Object && args[0].object && args[0].object->kind == HeapObject::Kind::String) {
 				std::string s = static_cast<StringObject *>(args[0].object)->data;
 				Key k = Key::NONE;
@@ -410,7 +415,11 @@ void ZelynLanguageFeatures::register_godot_builtins(NativeRegistry &reg) {
 				else if (s == "SHIFT" || s == "shift") k = Key::SHIFT;
 				else if (s == "E" || s == "e") k = Key::E;
 				if (k != Key::NONE) {
-					return Value(Value::BOOL, Input::get_singleton()->is_key_pressed(k) ? 1.0 : 0.0);
+					bool is_down = Input::get_singleton()->is_key_pressed(k) || Input::get_singleton()->is_physical_key_pressed(k);
+					if (!is_down && k == Key::ESCAPE) {
+						is_down = Input::get_singleton()->is_action_pressed("ui_cancel");
+					}
+					return Value(Value::BOOL, is_down ? 1.0 : 0.0);
 				}
 			}
 		}
@@ -436,7 +445,10 @@ void ZelynLanguageFeatures::register_godot_builtins(NativeRegistry &reg) {
 			if (k != Key::NONE) {
 				static HashMap<Key, bool> s_key_was_down;
 				static HashMap<Key, uint64_t> s_just_pressed_frame;
-				bool is_down = Input::get_singleton()->is_key_pressed(k);
+				bool is_down = Input::get_singleton()->is_key_pressed(k) || Input::get_singleton()->is_physical_key_pressed(k);
+				if (!is_down && k == Key::ESCAPE) {
+					is_down = Input::get_singleton()->is_action_pressed("ui_cancel");
+				}
 				uint64_t cur_frame = Engine::get_singleton() ? Engine::get_singleton()->get_physics_frames() : 0;
 				bool was_down = s_key_was_down.has(k) ? s_key_was_down[k] : false;
 				if (is_down) {

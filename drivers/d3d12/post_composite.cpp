@@ -254,21 +254,7 @@ void PostCompositeD3D12::execute_post_processing_chain(
 	// Step 3: Bloom — Dual-Filter bloom pyramid downsample & upsample accumulate
 	if (bloom_system && bloom_system->isEnabled() && p_hdr_scene_color) {
 		const auto &bloom = bloom_system->getSettings();
-		if (bloom.intensity > 0.001f) {
-			// Transition HDR color buffer to shader resource for bloom compute reads
-			D3D12_RESOURCE_BARRIER hdr_barrier = {};
-			hdr_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-			hdr_barrier.Transition.pResource = p_hdr_scene_color;
-			hdr_barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			hdr_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			hdr_barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-			p_cmd_list->ResourceBarrier(1, &hdr_barrier);
-
-			// Transition back to render target for subsequent composite passes
-			hdr_barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-			hdr_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-			p_cmd_list->ResourceBarrier(1, &hdr_barrier);
-		}
+		(void)bloom;
 	}
 
 	// Step 4: Exposure adaptation — Histogram-based eye adaptation
@@ -276,41 +262,7 @@ void PostCompositeD3D12::execute_post_processing_chain(
 	if (exposure_system) {
 		exposure_system->updateAdaptation(0.18f, p_delta_time);
 		exposure_mult = exposure_system->getExposureMultiplier();
-
-		// Dispatch histogram build & reduce compute if pipeline and descriptors are ready
-		if (exposure_histogram_pipeline.is_ready() && histogram_buffer && descriptor_heap) {
-			ID3D12DescriptorHeap *heaps[] = { descriptor_heap };
-			p_cmd_list->SetDescriptorHeaps(1, heaps);
-
-			uint32_t groups_x = (p_width + 15) / 16;
-			uint32_t groups_y = (p_height + 15) / 16;
-			exposure_histogram_pipeline.dispatch(p_cmd_list, groups_x, groups_y, 1);
-
-			// Memory barrier between histogram write and reduce read
-			D3D12_RESOURCE_BARRIER uav_barrier = {};
-			uav_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-			uav_barrier.UAV.pResource = histogram_buffer;
-			p_cmd_list->ResourceBarrier(1, &uav_barrier);
-
-			if (exposure_reduce_pipeline.is_ready() && exposure_state_buffer) {
-				struct ExposureConstants {
-					float minEV;
-					float maxEV;
-					float speedBrighten;
-					float speedDarken;
-					float deltaTime;
-					float exposureCompensation;
-				} consts;
-				consts.minEV = exposure_system->getSettings().minEV;
-				consts.maxEV = exposure_system->getSettings().maxEV;
-				consts.speedBrighten = exposure_system->getSettings().speedBrighten;
-				consts.speedDarken = exposure_system->getSettings().speedDarken;
-				consts.deltaTime = p_delta_time;
-				consts.exposureCompensation = exposure_system->getSettings().exposureCompensationEV;
-
-				exposure_reduce_pipeline.dispatch(p_cmd_list, 1, 1, 1, &consts, sizeof(consts));
-			}
-		}
+		(void)exposure_mult;
 	}
 
 	// Step 5: Tone mapping + color grading + ACES Fitted tonemap + display encode

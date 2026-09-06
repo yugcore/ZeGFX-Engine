@@ -500,7 +500,7 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	frame_render_graph->clear();
 
 	// Phase 2: Execute GPU Hi-Z Downsampling and Two-Phase Cluster Occlusion Culling
-	if (virtual_geom_manager && effective_cmd_list && p_depth_target) {
+	if (virtual_geom_manager && effective_cmd_list && p_depth_target && virtual_geom_manager->GetLodGroup(0) != nullptr) {
 		virtual_geom_manager->BuildHZB(
 				static_cast<ID3D12GraphicsCommandList *>(effective_cmd_list),
 				static_cast<ID3D12Resource *>(p_depth_target));
@@ -745,6 +745,11 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 		frame_render_graph->execute(effective_cmd_list);
 	}
 
+	// Restore Godot's descriptor heaps onto the active command list if modified
+	if (effective_cmd_list) {
+		restore_godot_descriptor_heaps(effective_cmd_list);
+	}
+
 	// Clear deferred state for next frame
 	pending_ao.dirty = false;
 	pending_dxr_reflections.dirty = false;
@@ -757,6 +762,18 @@ void ZeGFXD3D12Bridge::flush_deferred_passes(void *p_cmd_list, void *p_hdr_targe
 	// Note: we do NOT reset ao_pass_succeeded / dxr_reflections_succeeded / dxr_gi_succeeded / dxr_shadows_succeeded here because
 	// the Godot callsites that check them run AFTER execute_*_pass but BEFORE flush_deferred_passes.
 	// They will be reset at the start of the next frame's flush.
+}
+
+void ZeGFXD3D12Bridge::restore_godot_descriptor_heaps(void *p_cmd_list) {
+	if (!p_cmd_list || !godot_resource_heap || !godot_sampler_heap) {
+		return;
+	}
+
+	ID3D12DescriptorHeap *heaps[] = {
+		static_cast<ID3D12DescriptorHeap *>(godot_resource_heap),
+		static_cast<ID3D12DescriptorHeap *>(godot_sampler_heap),
+	};
+	static_cast<ID3D12GraphicsCommandList *>(p_cmd_list)->SetDescriptorHeaps(2, heaps);
 }
 
 void ZeGFXD3D12Bridge::driver_callback_flush_passes(RenderingDeviceDriver *p_driver, RDD::CommandBufferID p_cmd_buffer, void *p_userdata) {

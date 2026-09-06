@@ -150,6 +150,8 @@ private:
 	bool dxr_shadows_succeeded = false;
 	bool active_cmd_list_attached = false;
 	void *active_cmd_list = nullptr;
+	void *godot_resource_heap = nullptr;
+	void *godot_sampler_heap = nullptr;
 
 public:
 	static ZeGFXD3D12Bridge *get_singleton() { return singleton; }
@@ -170,6 +172,11 @@ public:
 	void set_main_command_queue(void *p_queue) { main_direct_queue = p_queue; }
 	void *get_main_command_queue() const { return main_direct_queue; }
 	GPUCommandQueueD3D12 *get_gpu_command_queue() const { return gpu_command_queue; }
+	void set_godot_descriptor_heaps(void *p_res_heap, void *p_sampler_heap) {
+		godot_resource_heap = p_res_heap;
+		godot_sampler_heap = p_sampler_heap;
+	}
+	void restore_godot_descriptor_heaps(void *p_cmd_list);
 
 	// Register and query cooked .zmesh assets
 	void register_zmesh_metadata(const String &p_path, uint32_t p_meshlet_count, uint32_t p_lod_count, uint32_t p_primitive_count, uint32_t p_vertex_stride);
