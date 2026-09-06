@@ -1416,6 +1416,10 @@ void unregister_scene_types() {
 		ResourceLoader::remove_resource_format_loader(resource_loader_zmat);
 		resource_loader_zmat.unref();
 	}
+	if (resource_loader_ztex.is_valid()) {
+		ResourceLoader::remove_resource_format_loader(resource_loader_ztex);
+		resource_loader_ztex.unref();
+	}
 
 	// StandardMaterial3D is not initialized when 3D is disabled, so it shouldn't be cleaned up either
 #ifndef _3D_DISABLED

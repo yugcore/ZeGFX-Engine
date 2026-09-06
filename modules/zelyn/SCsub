@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+from misc.utility.scons_hints import *
+
+Import("env")
+Import("env_modules")
+
+env_zelyn = env_modules.Clone()
+env_zelyn.Prepend(CPPPATH=[
+    "#modules/zelyn/zelyn_core/include",
+    "#modules/zelyn/zelyn_core/include/zelyn",
+    "#modules/zelyn/bridge",
+    "#modules/zelyn/runtime",
+    "#modules/zelyn",
+])
+
+if env.msvc:
+    env_zelyn.Append(CXXFLAGS=["/EHsc"])
+
+
+# Module adapter files
+env_zelyn.add_source_files(env.modules_sources, "*.cpp")
+env_zelyn.add_source_files(env.modules_sources, "bridge/*.cpp")
+env_zelyn.add_source_files(env.modules_sources, "runtime/*.cpp")
+
+# Core upstream Zelyn sources
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/bytecode_vm.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/compiler.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/executor.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/formatter.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/optimizer.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/parser.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/runtime.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/tokenizer.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/core/value_impl.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/api/core_api.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/api/gameplay_api.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/api/gameplay_module.cpp")
+env_zelyn.add_source_files(env.modules_sources, "zelyn_core/src/api/zelyn_c_api.cpp")
+
+if env.editor_build:
+    env_zelyn.add_source_files(env.modules_sources, "editor/*.cpp")

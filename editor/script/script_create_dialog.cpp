@@ -886,7 +886,9 @@ ScriptCreateDialog::ScriptCreateDialog() {
 	for (int i = 0; i < ScriptServer::get_language_count(); i++) {
 		String lang = ScriptServer::get_language(i)->get_name();
 		language_menu->add_item(lang);
-		if (lang == "GDScript") {
+		if (lang == "Zelyn") {
+			default_language = i;
+		} else if (lang == "GDScript" && default_language < 0) {
 			default_language = i;
 		}
 	}

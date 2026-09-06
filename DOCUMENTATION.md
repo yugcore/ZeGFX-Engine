@@ -389,3 +389,148 @@ All new subsystems are verified by automated unit tests in `tests/servers/test_z
   * Viewport DXR Debug Draw enum ordering and parity.
   * Headless boot under `--rendering-driver d3d12` with clean exit.
 
+---
+
+## 11. Zelyn Scripting Language Integration
+
+### 11.1 Overview & Zero-Bloat Philosophy
+
+ZeGFX-Engine integrates **Zelyn** as its premier first-class gameplay scripting language alongside GDScript and Knits Visual Scripting. Zelyn is designed to completely outclass GDScript in UX, elegance, and raw execution velocity:
+
+* **Zero-Boilerplate Ergonomics**: Direct child node access, automatic member resolution, and declarative event wiring eliminate tedious `$` / `get_node()` boilerplate.
+* **Modern C-Family & Rust Ergonomics**: Clean brace syntax (`{ ... }`), `let` and `var` bindings, modern lambdas, and optional type annotations.
+* **Native Bytecode Engine**: Powered by an ultra-compact stack-based virtual machine (`zelyn_core`) compiled directly into the engine binary with zero external dynamic dependencies.
+* **Pristine Core Preservation**: All ZeGFX-specific extensions, signal binders, state machines, and GDScript compatibility normalizers live in `modules/zelyn/bridge/` and `modules/zelyn/runtime/`, keeping upstream `zelyn_core` 100% untouched and upgradable.
+
+---
+
+### 11.2 Complete Keyword & Syntax Reference
+
+Zelyn supports both idiomatic Zelyn syntax and full keyword parity with GDScript:
+
+| Category | Keywords / Constructs | Example Syntax |
+| :--- | :--- | :--- |
+| **Variable Declarations** | `let`, `var`, `const` | `let speed: float = 300.0;`<br>`var health = 100;` |
+| **Functions & Methods** | `func`, `fn` | `func on_ready(self) { ... }`<br>`fn calculate(x: float, y: float) -> float { ... }` |
+| **Control Flow** | `if`, `else`, `elif`, `else if`, `while`, `for`, `in`, `return`, `break`, `continue` | `if x > 10 { ... } elif x > 5 { ... } else { ... }` |
+| **Placeholders & Nops** | `pass` | `pass;` (automatically normalized as no-op) |
+| **Literals & Identifiers** | `nil`, `null`, `true`, `false`, `self` | `if target == null { return nil; }` |
+| **Event Listeners** | `on <Node>.<signal>` | `on JumpButton.pressed() { self.jump(); }` |
+| **State Machines** | `state <Name>` | `state Patrol { ... }`<br>`state Attack { ... }` |
+
+#### Type Hint Tolerance
+The Zelyn engine bridge incorporates an AST/Token normalizer (`ZelynLanguageFeatures::normalize_tokens`). Developers can freely write typed GDScript-style or TypeScript-style annotations without compile errors:
+```zelyn
+let speed: float = 300.0;
+var count: int = 10;
+
+func on_process(self, dt: float) -> void {
+    // Process loop logic
+}
+```
+
+---
+
+### 11.3 GDScript Built-in Functions & Math Parity
+
+Zelyn includes full native bindings for GDScript's standard library and GlobalScope utilities:
+
+* **Logging & Console**: `print(...)`, `printerr(...)`, `push_error(...)`, `push_warning(...)`, `out(...)`
+* **Trigonometry**: `sin(rad)`, `cos(rad)`, `tan(rad)`, `asin(val)`, `acos(val)`, `atan(val)`, `atan2(y, x)`, `deg_to_rad(deg)`, `rad_to_deg(rad)`
+* **Interpolation & Clamping**:
+  * `lerp(from, to, weight)`
+  * `clamp(val, min, max)`
+  * `remap(val, istart, istop, ostart, ostop)`
+  * `smoothstep(from, to, weight)`
+  * `move_toward(from, to, delta)`
+  * `rotate_toward(from, to, delta)`
+* **Rounding & Signs**: `round(val)`, `floor(val)`, `ceil(val)`, `abs(val)`, `sign(val)`, `sqrt(val)`
+* **Random Numbers**:
+  * `randf()`: Random float in $[0.0, 1.0)$
+  * `randi()`: Random unsigned 32-bit integer
+  * `randf_range(min, max)`: Random float in specified range
+  * `randi_range(min, max)`: Random integer in specified range
+  * `randomize()`: Re-seed engine random number generator
+* **Engine & Object Utilities**:
+  * `is_instance_valid(obj)`: Validates if an Object pointer is alive
+  * `str(val)` / `to_string(val)`: Converts any Variant or primitive to string
+  * `wait(frames)` / `wait_seconds(seconds)`: Coroutine tick and timer delay
+
+---
+
+### 11.4 Game-Ready Script Examples
+
+#### 1. Zero-Boilerplate 3D Character Controller
+```zelyn
+// extends CharacterBody3D
+
+let speed: float = 300.0;
+let jump_force: float = 450.0;
+let gravity: float = 980.0;
+
+func on_ready(self) {
+    print("Player initialized: " + self.get_name());
+}
+
+func on_physics_process(self, dt: float) {
+    let velocity = self.get_velocity();
+    
+    if !self.is_on_floor() {
+        velocity.y = velocity.y - (gravity * dt);
+    }
+    
+    // Direct child node access without get_node()
+    if self.is_on_floor() && Input.is_action_just_pressed("jump") {
+        velocity.y = jump_force;
+        AudioStreamPlayer.play();
+    }
+    
+    self.set_velocity(velocity);
+    self.move_and_slide();
+}
+```
+
+#### 2. Declarative Signal Binding & Built-In State Machine
+```zelyn
+// extends Node2D
+
+state Idle {
+    func on_enter(self) {
+        AnimatedSprite2D.play("idle");
+    }
+    func on_update(self, dt: float) {
+        if self.has_target() {
+            transition_to("Combat");
+        }
+    }
+}
+
+state Combat {
+    func on_enter(self) {
+        AnimatedSprite2D.play("attack");
+    }
+}
+
+// Automatically binds to Hitbox2D's area_entered signal on ready
+on Hitbox2D.area_entered(area) {
+    print("Enemy struck area: " + str(area));
+    transition_to("Combat");
+}
+```
+
+---
+
+### 11.5 Editor Architecture & Syntax Highlighting
+
+The Zelyn editor integration provides full IDE-grade support within the ZeGFX script editor:
+
+* **Real-Time Syntax Coloration (`ZelynEditorSyntaxHighlighter`)**:
+  * Engine native classes (`ClassDB`) colorized with engine type palette.
+  * Variant types (`Vector2`, `Vector3`, `Color`, `Transform3D`, etc.).
+  * Keywords and control flow tokens (`let`, `var`, `func`, `state`, `on`, `if`, `else`, `return`).
+  * Comments (`//` line comments, `/* */` block comments, `///` documentation comments).
+  * Strings with escape sequences and character literals.
+* **Code Completion & Outline**: Functions and methods are indexed in real time to populate the script editor method list and quick jump panel.
+* **Direct Execution & Instance Lifetime**: `ZelynScriptInstance` maintains full bidirectional bindings with Godot's `Object` reference system, ensuring robust garbage collection, script reloads, and inspector property persistence.
+
+

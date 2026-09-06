@@ -92,22 +92,27 @@ struct DXCHelper {
             return false;
         }
 
+        std::wstring root_dir;
+        WCHAR exe_path[MAX_PATH];
+        if (GetModuleFileNameW(nullptr, exe_path, MAX_PATH)) {
+            WCHAR *last_slash = wcsrchr(exe_path, L'\\');
+            if (last_slash) {
+                *last_slash = L'\0';
+                WCHAR *parent_slash = wcsrchr(exe_path, L'\\');
+                if (parent_slash) {
+                    root_dir = std::wstring(exe_path, parent_slash - exe_path);
+                } else {
+                    root_dir = exe_path;
+                }
+            }
+        }
+
         IDxcBlobEncoding* source_blob = nullptr;
         hr = utils->LoadFile(file_path.c_str(), nullptr, &source_blob);
         if (FAILED(hr) || !source_blob) {
-            WCHAR exe_path[MAX_PATH];
-            if (GetModuleFileNameW(nullptr, exe_path, MAX_PATH)) {
-                WCHAR *last_slash = wcsrchr(exe_path, L'\\');
-                if (last_slash) {
-                    *last_slash = L'\0';
-                    WCHAR *parent_slash = wcsrchr(exe_path, L'\\');
-                    std::wstring root_dir = exe_path;
-                    if (parent_slash) {
-                        root_dir = std::wstring(exe_path, parent_slash - exe_path);
-                    }
-                    std::wstring alt_path = root_dir + L"/" + file_path;
-                    hr = utils->LoadFile(alt_path.c_str(), nullptr, &source_blob);
-                }
+            if (!root_dir.empty()) {
+                std::wstring alt_path = root_dir + L"/" + file_path;
+                hr = utils->LoadFile(alt_path.c_str(), nullptr, &source_blob);
             }
         }
         if (FAILED(hr) || !source_blob) {
@@ -128,15 +133,31 @@ struct DXCHelper {
         }
         arguments.push_back(L"-T");
         arguments.push_back(target.c_str());
+
+        std::wstring inc1 = !root_dir.empty() ? (root_dir + L"/ZeGFX/shaders/dx12") : L"ZeGFX/shaders/dx12";
+        std::wstring inc2 = !root_dir.empty() ? (root_dir + L"/ZeGFX/shaders/dx12/include") : L"ZeGFX/shaders/dx12/include";
+        arguments.push_back(L"-I");
+        arguments.push_back(inc1.c_str());
         arguments.push_back(L"-I");
         arguments.push_back(L"ZeGFX/shaders/dx12");
         arguments.push_back(L"-I");
+        arguments.push_back(inc2.c_str());
+        arguments.push_back(L"-I");
         arguments.push_back(L"ZeGFX/shaders/dx12/include");
+
         arguments.push_back(L"-Qstrip_debug");
         arguments.push_back(L"-O3");
 
+        IDxcIncludeHandler* include_handler = nullptr;
+        if (utils) {
+            utils->CreateDefaultIncludeHandler(&include_handler);
+        }
+
         IDxcResult* result = nullptr;
-        hr = compiler->Compile(&source_buffer, arguments.data(), static_cast<UINT32>(arguments.size()), nullptr, IID_PPV_ARGS(&result));
+        hr = compiler->Compile(&source_buffer, arguments.data(), static_cast<UINT32>(arguments.size()), include_handler, IID_PPV_ARGS(&result));
+        if (include_handler) {
+            include_handler->Release();
+        }
 
         if (SUCCEEDED(hr) && result) {
             HRESULT status = S_OK;

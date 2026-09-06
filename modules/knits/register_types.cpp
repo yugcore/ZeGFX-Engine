@@ -8,6 +8,7 @@
 #include "knits_node.h"
 #include "knits_resource_format.h"
 #include "knits_script.h"
+#include "knits_zelyn_expression_node.h"
 
 #include "core/io/resource_loader.h"
 #include "core/io/resource_saver.h"
@@ -38,6 +39,7 @@ void initialize_knits_module(ModuleInitializationLevel p_level) {
 		GDREGISTER_CLASS(KnitNode);
 		GDREGISTER_CLASS(KnitsGraph);
 		GDREGISTER_CLASS(KnitsScript);
+		GDREGISTER_CLASS(KnitNodeZelynExpression);
 
 		knits_language = memnew(KnitsScriptLanguage);
 		ScriptServer::register_language(knits_language);
