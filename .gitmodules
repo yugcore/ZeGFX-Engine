@@ -1,3 +1,6 @@
 [submodule "ZeGFX"]
 	path = ZeGFX
 	url = https://github.com/yugcore/ZeGFX.git
+[submodule "modules/zelyn/zelyn_core"]
+	path = modules/zelyn/zelyn_core
+	url = https://github.com/yugcore/Zelyn.git
